@@ -1,0 +1,14 @@
+alter type position_code add value if not exists 'LB';
+alter type position_code add value if not exists 'CB';
+alter type position_code add value if not exists 'RB';
+alter type position_code add value if not exists 'LWB';
+alter type position_code add value if not exists 'RWB';
+alter type position_code add value if not exists 'CDM';
+alter type position_code add value if not exists 'CM';
+alter type position_code add value if not exists 'CAM';
+alter type position_code add value if not exists 'LM';
+alter type position_code add value if not exists 'RM';
+alter type position_code add value if not exists 'LW';
+alter type position_code add value if not exists 'RW';
+alter type position_code add value if not exists 'CF';
+alter type position_code add value if not exists 'ST';
