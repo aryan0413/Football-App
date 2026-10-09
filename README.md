@@ -2,6 +2,10 @@
 
 A responsive Next.js football community app with Clerk authentication and Supabase/Postgres application data.
 
+## Live app
+
+Production: https://football-omega-fawn.vercel.app
+
 ## Stack
 
 - Next.js App Router with TypeScript
