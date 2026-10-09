@@ -77,18 +77,6 @@ export async function POST(request: Request) {
     const previousNotes = snapshot.match.notes ?? null;
 
     if (action === "RESTART") {
-      const teamIds = (snapshot.teams ?? []).map((team: any) => team.id).filter(Boolean);
-      if (teamIds.length) {
-        const { error: teamPlayerError } = await supabase.from("team_players").delete().in("team_id", teamIds);
-        if (teamPlayerError) throw teamPlayerError;
-      }
-      if (snapshot.auction?.id) {
-        const { error: bidDeleteError } = await supabase.from("auction_bids").delete().eq("auction_id", snapshot.auction.id);
-        if (bidDeleteError) throw bidDeleteError;
-      }
-      const { error: liveError } = await supabase.from("auctions").update({ status: "LIVE" }).eq("id", snapshot.auction.id);
-      if (liveError) throw liveError;
-
       const resetBase = {
         ...snapshot.state,
         status: "LIVE" as const,
@@ -103,6 +91,18 @@ export async function POST(request: Request) {
       };
       const written = await writeAuctionStateCas(supabase, matchId, previousNotes, nextState);
       if (!written) return Response.json({ error: "Auction changed. Sync and try again." }, { status: 409 });
+
+      const teamIds = (snapshot.teams ?? []).map((team: any) => team.id).filter(Boolean);
+      if (teamIds.length) {
+        const { error: teamPlayerError } = await supabase.from("team_players").delete().in("team_id", teamIds);
+        if (teamPlayerError) throw teamPlayerError;
+      }
+      if (snapshot.auction?.id) {
+        const { error: bidDeleteError } = await supabase.from("auction_bids").delete().eq("auction_id", snapshot.auction.id);
+        if (bidDeleteError) throw bidDeleteError;
+      }
+      const { error: liveError } = await supabase.from("auctions").update({ status: "LIVE" }).eq("id", snapshot.auction.id);
+      if (liveError) throw liveError;
       return freshResponse(supabase, matchId);
     }
 

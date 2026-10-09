@@ -123,7 +123,7 @@ export function OnboardingForm() {
         <div>
           <p className="eyebrow">Create profile</p>
           <h2 className="mt-1 text-3xl font-black leading-tight sm:text-4xl">Step onto the pitch</h2>
-          <p className="mt-2 text-sm font-medium text-[var(--muted)]">Name, position, photo. No phone number, no clutter.</p>
+          <p className="mt-2 text-sm font-medium text-[var(--muted)]">Name, position, photo.</p>
         </div>
 
         <div className="grid gap-4">

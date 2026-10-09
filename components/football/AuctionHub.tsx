@@ -55,8 +55,8 @@ export function AuctionHub({ groups, playersByGroup }: { groups: AuctionGroup[];
         <div className="relative z-10 grid gap-3">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-white/62">Auction setup</p>
-            <h2 className="text-2xl font-black text-white">Start Auction First</h2>
-            <p className="mt-2 text-sm text-white/68">Choose a football group. The auction uses the players already added to that group.</p>
+            <h2 className="text-2xl font-black text-white">Auction Room</h2>
+            <p className="mt-2 text-sm text-white/68">Pick a group to build teams.</p>
           </div>
           <select className="field" value={selectedGroupId} onChange={(event) => setSelectedGroupId(event.target.value)}>
             {groups.map((group) => (

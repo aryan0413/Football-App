@@ -139,7 +139,7 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
       setSaving(false);
       return;
     }
-    setMessage("Auction setup saved. Captains can now join and mark ready.");
+    setMessage("Setup saved.");
     router.refresh();
   }
 
@@ -165,7 +165,7 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
     return (
       <div className="surface p-4">
         <div className="section-title mb-3"><h2>Auction Setup</h2></div>
-        <div className="empty-state min-h-0">Waiting for the owner/admin to choose captains and auction players.</div>
+        <div className="empty-state min-h-0">Setup pending.</div>
       </div>
     );
   }
@@ -176,15 +176,15 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
         <div className="auction-setup-header">
           <div>
             <p className="eyebrow">Auction setup</p>
-            <h2>Preparing Team Slots</h2>
-            <p>Team A and Team B are being created for this auction.</p>
+            <h2>Preparing Teams</h2>
+            <p>Creating Team A and Team B.</p>
           </div>
         </div>
         <button className="btn-primary w-full sm:w-fit" type="button" onClick={() => router.refresh()}>
           Reload Auction Setup
         </button>
         <div className="empty-state min-h-0">
-          Reload once. After Team A and Team B appear, player taps will assign captains.
+          Reload after team slots appear.
         </div>
       </div>
     );
@@ -195,13 +195,13 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
       <div className="auction-setup-header">
         <div>
           <p className="eyebrow">Auction setup</p>
-          <h2>{step === "captains" ? "Choose Captains First" : step === "auctioneer" ? "Choose Auctioneer" : "Choose Auction Players"}</h2>
+          <h2>{step === "captains" ? "Select Captains" : step === "auctioneer" ? "Select Auctioneer" : "Auction Pool"}</h2>
           <p>
             {step === "captains"
-              ? "Select two captains before choosing the auctioneer."
+              ? "Pick two captains."
               : step === "auctioneer"
-                ? "Select one auctioneer who will run sold, stop, restart, and undo controls."
-                : "Now choose which players will enter bidding."}
+                ? "Pick the room controller."
+                : "Pick players for bidding."}
           </p>
         </div>
       </div>
@@ -212,7 +212,7 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
             {setupTeams.map((team) => (
               <button key={team.id} className={`auction-captain-card ${activeTeam?.id === team.id ? "auction-captain-card-active" : ""}`} type="button" onClick={() => setActiveTeamId(team.id)}>
                 <span>{team.name} Captain</span>
-                <strong>{playerById.get(captains[team.id])?.display_name ?? "Tap a player below"}</strong>
+                <strong>{playerById.get(captains[team.id])?.display_name ?? "Unassigned"}</strong>
               </button>
             ))}
           </div>
@@ -236,11 +236,11 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
           </div>
 
           <button className="btn-primary w-full sm:w-fit" disabled={!captainsPicked} type="button" onClick={() => setStep("auctioneer")}>
-            Next: Choose Auctioneer
+            Next: Auctioneer
           </button>
           {!captainsPicked ? (
             <div className="empty-state min-h-0">
-              Choose captains for both teams before selecting the auctioneer.
+              Two captains required.
             </div>
           ) : null}
         </>
@@ -257,7 +257,7 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
               return (
                 <PlayerTile
                   key={player.id}
-                  detail={captain ? "Captain - cannot auctioneer" : `@${player.username} - ${player.preferred_position}`}
+                  detail={captain ? "Captain" : `@${player.username} - ${player.preferred_position}`}
                   disabled={captain}
                   onSelect={setAuctioneer}
                   player={player}
@@ -268,11 +268,11 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
             })}
           </div>
           <button className="btn-primary w-full sm:w-fit" disabled={!auctioneerPicked} type="button" onClick={() => setStep("players")}>
-            Next: Choose Auction Players
+            Next: Pool
           </button>
           {!auctioneerPicked ? (
             <div className="empty-state min-h-0">
-              Choose one auctioneer who is not a captain.
+              Auctioneer required.
             </div>
           ) : null}
         </div>
@@ -280,7 +280,7 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
         <div className="grid gap-3">
           <div>
             <button className="btn-secondary" type="button" onClick={() => setStep("auctioneer")}>
-              Back to Auctioneer
+              Back
             </button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -295,7 +295,7 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
               return (
                 <PlayerTile
                   key={player.id}
-                  detail={captain ? "Captain - not in auction" : auctioneerSelected ? "Auctioneer - not in auction" : `@${player.username} - ${player.preferred_position}`}
+                  detail={captain ? "Captain" : auctioneerSelected ? "Auctioneer" : `@${player.username} - ${player.preferred_position}`}
                   disabled={captain || auctioneerSelected}
                   onSelect={togglePlayer}
                   player={player}
@@ -306,7 +306,7 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
             })}
           </div>
           <button className="btn-primary w-full sm:w-fit" disabled={saving || auctionPlayerCount < 1} type="button" onClick={saveSetup}>
-            {saving ? "Opening auction room..." : "Save Setup & Open Auction Room"}
+            {saving ? "Saving..." : "Save Setup"}
           </button>
         </div>
       )}

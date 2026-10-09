@@ -306,13 +306,13 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
       "/api/auctions/ready",
       { matchId, forceStart },
       forceStart ? "start" : "ready",
-      forceStart ? "Waiting for both captains and the auctioneer." : "You are ready. Auction starts when both captains and the auctioneer are ready."
+      forceStart ? "Waiting for room." : "Ready."
     );
   }
 
   async function sellCurrentPlayer() {
     if (!currentPlayer) return;
-    await applyAction("/api/auctions/sell", { matchId, playerId: currentPlayer.id }, "sell", "Player sold to highest bidder.");
+    await applyAction("/api/auctions/sell", { matchId, playerId: currentPlayer.id }, "sell", "Sold.");
   }
 
   async function controlAuction(action: "STOP" | "RESUME" | "SKIP" | "UNSOLD" | "RESTART" | "UNDO") {
@@ -320,7 +320,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
   }
 
   async function completeAuction() {
-    await applyAction("/api/auctions/end", { matchId }, "end", "Auction completed. Schedule the match now.", true);
+    await applyAction("/api/auctions/end", { matchId }, "end", "Auction complete.", true);
   }
 
   const connectionCopy = {
@@ -361,7 +361,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
                     <span className="text-xs font-black text-[var(--muted)]">INR {formatAuctionMoney(Number(row.auction_price ?? 0))}</span>
                   </div>
                 ) : null)}
-                {!team.team_players?.length ? <div className="empty-state min-h-0">No players bought yet</div> : null}
+                {!team.team_players?.length ? <div className="empty-state min-h-0">Empty squad</div> : null}
               </div>
             </div>
           );
@@ -383,12 +383,12 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
 
           {captainTeam ? (
             <div className="rounded-lg border border-[rgba(242,185,75,0.45)] bg-[rgba(242,185,75,0.16)] p-3 text-sm font-black text-white">
-              <div className="flex items-center gap-2"><Bell size={17} /> You are selected as captain for {captainTeam.name}. Your bids are saved live.</div>
+              <div className="flex items-center gap-2"><Bell size={17} /> Captain: {captainTeam.name}</div>
             </div>
           ) : null}
           {isAuctioneer ? (
             <div className="rounded-lg border border-white/20 bg-white/12 p-3 text-sm font-black text-white">
-              <div className="flex items-center gap-2"><Gavel size={17} /> You are the auctioneer. Live controls are handed to you.</div>
+              <div className="flex items-center gap-2"><Gavel size={17} /> Auctioneer controls active</div>
             </div>
           ) : null}
 
@@ -411,7 +411,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
             <div className="grid gap-2 sm:grid-cols-2">
               {captainTeam || isAuctioneer ? (
                 <button className="btn-primary" disabled={currentUserReady || busyKey === "ready"} type="button" onClick={() => markReady(false)}>
-                  <Check size={18} /> {currentUserReady ? "You are ready" : busyKey === "ready" ? "Joining..." : "Join Auction Room"}
+                  <Check size={18} /> {currentUserReady ? "Ready" : busyKey === "ready" ? "Joining..." : "Join Room"}
                 </button>
               ) : null}
               {canStartAuction ? (
@@ -433,7 +433,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
             </div>
             <div>
               <div className="text-xs font-black uppercase text-white/54">Your team</div>
-              <div className="truncate font-black">{captainTeam?.name ?? (isAuctioneer ? "Auctioneer" : "Captain only")}</div>
+              <div className="truncate font-black">{captainTeam?.name ?? (isAuctioneer ? "Auctioneer" : "No team")}</div>
             </div>
           </div>
 
@@ -460,7 +460,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
               </div>
             ) : (
               <div className="rounded-lg bg-white/10 p-4 text-sm font-bold text-white/72">
-                {ended ? "Final squads are saved. Reopening this auction will show these results." : "The next available player will appear when the auction goes live."}
+                {ended ? "Final squads saved." : "Player reveal pending."}
               </div>
             )}
           </div>
@@ -479,7 +479,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
             </div>
           ) : live || paused ? (
             <div className="rounded-lg bg-white/10 p-3 text-sm font-bold text-white/72">
-              {snapshot.state.auctioneerId ? "The selected auctioneer controls sold, stop, restart, and undo actions." : "Auction controls are limited to admins until an auctioneer is selected."}
+              {snapshot.state.auctioneerId ? "Auctioneer controls active." : "Admin controls active until setup."}
             </div>
           ) : null}
 
@@ -493,7 +493,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
                 <Users size={18} />
                 <span>
                   {snapshot.remainingPlayers.length
-                    ? "Future players stay hidden. The next player appears automatically when this round closes."
+                    ? "Queue sealed. Next player reveals after the round."
                     : "No remaining hidden players."}
                 </span>
               </div>

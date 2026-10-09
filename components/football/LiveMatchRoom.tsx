@@ -449,7 +449,7 @@ export function LiveMatchRoom({ match, teams, players, events, ratings = [], can
           <div className="broadcast-meta">
             <span><CalendarClock size={16} /> {localMatch.scheduled_date} {localMatch.match_time}</span>
             <span><MapPin size={16} /> {localMatch.location}</span>
-            <span><Activity size={16} /> {latestEvent ? `Latest: ${latestEvent.scorer?.display_name ?? "Goal"} ${eventMinute(latestEvent)}` : "Awaiting first event"}</span>
+            <span><Activity size={16} /> {latestEvent ? `Latest: ${latestEvent.scorer?.display_name ?? "Goal"} ${eventMinute(latestEvent)}` : "No events yet"}</span>
           </div>
         </div>
 
@@ -481,7 +481,7 @@ export function LiveMatchRoom({ match, teams, players, events, ratings = [], can
                 <div className="empty-state">
                   <div>
                     <Target className="mx-auto mb-3 text-[var(--accent-dark)]" size={28} />
-                    <p className="font-black text-[var(--foreground)]">No goals yet</p>
+                    <p className="font-black text-[var(--foreground)]">No goals</p>
                     <p className="mt-1 text-sm">Goals, assists and major moments will appear here.</p>
                   </div>
                 </div>
@@ -546,7 +546,7 @@ export function LiveMatchRoom({ match, teams, players, events, ratings = [], can
             <div className="relative z-10">
               <p className="text-xs font-black uppercase tracking-wide text-white/62">Broadcast console</p>
               <h2 className="text-2xl font-black text-white">Goal Studio</h2>
-              <p className="mt-1 text-sm font-bold text-white/64">Tap a player to score instantly. Use details for assists.</p>
+              <p className="mt-1 text-sm font-bold text-white/64">Tap scorer. Add assist in details.</p>
             </div>
             {!live && !ended ? (
               <button className="btn-primary" type="button" onClick={startMatch}><Play size={18} /> Start Match</button>

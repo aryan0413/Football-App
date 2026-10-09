@@ -217,7 +217,7 @@ export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches:
               </div>
               {selectedIsAuction ? (
                 <div className="data-row p-3 text-sm font-bold text-[var(--muted)]">
-                  Auction is still in progress. Complete the auction and schedule the match before opening the match room.
+                  Auction active. Finish it before match room opens.
                 </div>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-3">
@@ -235,8 +235,8 @@ export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches:
             <div className="empty-state">
               <div>
                 <Trophy className="mx-auto mb-3 text-[var(--accent-dark)]" size={28} />
-                <p className="font-black text-[var(--foreground)]">Create your first match</p>
-                <p className="mt-1 text-sm">Your match room and live scoreboard will appear here.</p>
+                <p className="font-black text-[var(--foreground)]">No match selected</p>
+                <p className="mt-1 text-sm">Schedule a match to open the room.</p>
               </div>
             </div>
           )}

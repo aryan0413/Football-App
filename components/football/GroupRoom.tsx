@@ -279,8 +279,8 @@ export function GroupRoom({ group, role, members, matches, leaderboard, initialP
           <div className="pitch-card p-4">
             <div className="relative z-10">
               <p className="text-xs font-black uppercase tracking-wide text-white/62">Auction</p>
-              <h2 className="text-2xl font-black text-white">Build Teams</h2>
-              <p className="mt-2 text-sm text-white/68">{activeAuction ? "Continue the active auction for this group." : "Finalize availability, then start an auction for this group."}</p>
+              <h2 className="text-2xl font-black text-white">Auction Room</h2>
+              <p className="mt-2 text-sm text-white/68">{activeAuction ? "Active auction ready." : "Create teams from group players."}</p>
               <button className="btn-primary mt-5 w-full" disabled={auctionStarting} type="button" onClick={startAuction}><Gavel size={18} /> {auctionStarting ? "Starting..." : activeAuction ? "Join Back Auction" : "Start Auction"}</button>
             </div>
           </div>
