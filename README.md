@@ -19,3 +19,10 @@ A responsive Next.js football community app with Clerk authentication and Supaba
 4. Start the app with `npm run dev`.
 
 Clerk is the login identity provider. The `users.clerk_user_id` column links each Clerk account to an internal player UUID, and all football relationships use the internal UUID.
+
+## Git workflow
+
+- Development workspace: `C:\Users\ARYAN M\OneDrive\Desktop\Football` on the `dev` branch.
+- Production workspace: `C:\Users\ARYAN M\OneDrive\Desktop\Football-prod` on the `prod` branch.
+- Commit normal changes from the development workspace, then push `dev`.
+- Promote to production by merging `dev` into `prod`, running `npm run typecheck` and `npm run build`, then pushing `prod` and deploying.
