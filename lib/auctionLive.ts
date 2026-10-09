@@ -20,15 +20,26 @@ export type AuctionCompletionState = {
   at: string;
 };
 
+export type AuctionUndoFrame = {
+  id: string;
+  action: "BID" | "SELL" | "SKIP" | "UNSOLD" | "STOP" | "RESUME";
+  state: Omit<AuctionControlState, "undoStack"> & { undoStack?: AuctionUndoFrame[] };
+  bidId?: string;
+  teamPlayer?: { teamId: string; playerId: string };
+  at: string;
+};
+
 export type AuctionControlState = {
   kind: "football-auction-state-v1";
   version: number;
   status: AuctionControlStatus;
   order: string[];
+  auctioneerId: string | null;
   currentPlayerId: string | null;
   currentBid: AuctionBidState | null;
   completed: Record<string, AuctionCompletionState>;
   bidHistory: AuctionBidState[];
+  undoStack: AuctionUndoFrame[];
   updatedAt: string;
 };
 
@@ -38,6 +49,7 @@ export type AuctionSnapshot = {
   state: AuctionControlState;
   teams: any[];
   selectedPlayers: any[];
+  auctioneer: any | null;
   currentPlayer: any | null;
   remainingPlayers: any[];
   completedPlayers: Array<AuctionCompletionState & { player: any | null; teamName?: string | null }>;
@@ -51,10 +63,12 @@ export function emptyAuctionState(status: AuctionControlStatus = "DRAFT"): Aucti
     version: 1,
     status,
     order: [],
+    auctioneerId: null,
     currentPlayerId: null,
     currentBid: null,
     completed: {},
     bidHistory: [],
+    undoStack: [],
     updatedAt: new Date().toISOString()
   };
 }
@@ -70,6 +84,8 @@ export function parseAuctionState(notes: string | null | undefined, fallbackStat
         ...parsed,
         completed: parsed.completed ?? {},
         bidHistory: Array.isArray(parsed.bidHistory) ? parsed.bidHistory : [],
+        undoStack: Array.isArray(parsed.undoStack) ? parsed.undoStack.slice(0, 30) : [],
+        auctioneerId: typeof parsed.auctioneerId === "string" ? parsed.auctioneerId : null,
         order: Array.isArray(parsed.order) ? parsed.order : []
       } as AuctionControlState;
     }
@@ -160,7 +176,27 @@ export function minimumAuctionBid(currentBid: AuctionBidState | null) {
   return currentBid ? nextRequiredBid(Number(currentBid.amount ?? 0)) : AUCTION_BASE_PRICE;
 }
 
-function readyRoleForUser(userId: string, captainTeamByUser: Map<string, string>) {
+export function pushAuctionUndo(
+  state: AuctionControlState,
+  action: AuctionUndoFrame["action"],
+  extra: Pick<AuctionUndoFrame, "bidId" | "teamPlayer"> = {}
+) {
+  const frame: AuctionUndoFrame = {
+    id: crypto.randomUUID(),
+    action,
+    state: {
+      ...state,
+      undoStack: state.undoStack ?? []
+    },
+    ...extra,
+    at: new Date().toISOString()
+  };
+
+  return [frame, ...(state.undoStack ?? [])].slice(0, 30);
+}
+
+function readyRoleForUser(userId: string, captainTeamByUser: Map<string, string>, auctioneerId: string | null) {
+  if (auctioneerId === userId) return "AUCTIONEER";
   return captainTeamByUser.has(userId) ? `CAPTAIN:${captainTeamByUser.get(userId)}` : "OWNER";
 }
 
@@ -236,6 +272,14 @@ export async function getAuctionSnapshot(supabase: any, matchId: string): Promis
   const teamNameById = new Map<string, string>((teams ?? []).map((team: any) => [String(team.id), String(team.name)]));
   const playerById = new Map<string, any>(selectedPlayers.map((player: any) => [String(player.id), player]));
   const currentPlayer = state.currentPlayerId ? playerById.get(state.currentPlayerId) ?? null : null;
+  const { data: auctioneer, error: auctioneerError } = state.auctioneerId
+    ? await supabase
+        .from("users")
+        .select("id, display_name, username, preferred_position, profile_image")
+        .eq("id", state.auctioneerId)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (auctioneerError) throw auctioneerError;
   const remainingPlayers = state.order
     .filter((playerId) => playerId !== state.currentPlayerId && !state.completed[playerId])
     .map((playerId) => playerById.get(playerId))
@@ -258,7 +302,7 @@ export async function getAuctionSnapshot(supabase: any, matchId: string): Promis
 
   const readyRows = (readyAvailability ?? []).map((row: any) => ({
     user_id: row.user_id,
-    role: readyRoleForUser(row.user_id, captainTeamByUser)
+    role: readyRoleForUser(row.user_id, captainTeamByUser, state.auctioneerId)
   }));
 
   return {
@@ -267,6 +311,7 @@ export async function getAuctionSnapshot(supabase: any, matchId: string): Promis
     state,
     teams: teams ?? [],
     selectedPlayers,
+    auctioneer,
     currentPlayer,
     remainingPlayers,
     completedPlayers,

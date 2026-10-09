@@ -23,6 +23,7 @@ type AuctionSetupFormProps = {
   teams: Team[];
   players: Player[];
   selectedPlayerIds: string[];
+  auctioneerId: string | null;
   canManage: boolean;
 };
 
@@ -78,13 +79,14 @@ const PlayerTile = memo(function PlayerTile({ player, selected, disabled, status
   );
 });
 
-export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, canManage }: AuctionSetupFormProps) {
+export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, auctioneerId, canManage }: AuctionSetupFormProps) {
   const router = useRouter();
   const setupTeams = useMemo(() => teams.slice(0, 2), [teams]);
   const [message, setMessage] = useState("");
-  const [step, setStep] = useState<"captains" | "players">("captains");
+  const [step, setStep] = useState<"captains" | "auctioneer" | "players">("captains");
   const [activeTeamId, setActiveTeamId] = useState(setupTeams[0]?.id ?? "");
   const [saving, setSaving] = useState(false);
+  const [auctioneer, setAuctioneer] = useState(auctioneerId ?? "");
   const [captains, setCaptains] = useState<Record<string, string>>(() =>
     Object.fromEntries(setupTeams.map((team) => [team.id, team.captain_id ?? ""]))
   );
@@ -99,7 +101,9 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, c
   }, [captains, setupTeams]);
   const captainCount = captainIds.size;
   const captainsPicked = setupTeams.length >= 2 && captainCount >= 2;
-  const auctionPlayerCount = Array.from(selected).filter((playerId) => !captainIds.has(playerId)).length;
+  const auctioneerPicked = Boolean(auctioneer) && !captainIds.has(auctioneer);
+  const roleIds = useMemo(() => new Set([...Array.from(captainIds), auctioneer].filter(Boolean)), [auctioneer, captainIds]);
+  const auctionPlayerCount = Array.from(selected).filter((playerId) => !roleIds.has(playerId)).length;
   const activeTeam = setupTeams.find((team) => team.id === activeTeamId) ?? setupTeams[0];
 
   useEffect(() => {
@@ -125,7 +129,8 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, c
       body: JSON.stringify({
         matchId,
         teams: payload,
-        playerIds: Array.from(selected).filter((playerId) => !captainIds.has(playerId))
+        auctioneerId: auctioneer,
+        playerIds: Array.from(selected).filter((playerId) => !roleIds.has(playerId))
       })
     });
     const data = await response.json().catch(() => ({}));
@@ -147,14 +152,14 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, c
   }, [activeTeam, captains, setupTeams]);
 
   const togglePlayer = useCallback((playerId: string) => {
-    if (captainIds.has(playerId)) return;
+    if (roleIds.has(playerId)) return;
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(playerId)) next.delete(playerId);
       else next.add(playerId);
       return next;
     });
-  }, [captainIds]);
+  }, [roleIds]);
 
   if (!canManage) {
     return (
@@ -190,8 +195,14 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, c
       <div className="auction-setup-header">
         <div>
           <p className="eyebrow">Auction setup</p>
-          <h2>{step === "captains" ? "Choose Captains First" : "Choose Auction Players"}</h2>
-          <p>{step === "captains" ? "Select two captains before choosing the auction pool." : "Now choose which players will enter bidding."}</p>
+          <h2>{step === "captains" ? "Choose Captains First" : step === "auctioneer" ? "Choose Auctioneer" : "Choose Auction Players"}</h2>
+          <p>
+            {step === "captains"
+              ? "Select two captains before choosing the auctioneer."
+              : step === "auctioneer"
+                ? "Select one auctioneer who will run sold, stop, restart, and undo controls."
+                : "Now choose which players will enter bidding."}
+          </p>
         </div>
       </div>
 
@@ -224,20 +235,52 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, c
             })}
           </div>
 
-          <button className="btn-primary w-full sm:w-fit" disabled={!captainsPicked} type="button" onClick={() => setStep("players")}>
-            Next: Choose Auction Players
+          <button className="btn-primary w-full sm:w-fit" disabled={!captainsPicked} type="button" onClick={() => setStep("auctioneer")}>
+            Next: Choose Auctioneer
           </button>
           {!captainsPicked ? (
             <div className="empty-state min-h-0">
-              Choose captains for both teams before selecting auction players.
+              Choose captains for both teams before selecting the auctioneer.
             </div>
           ) : null}
         </>
-      ) : (
+      ) : step === "auctioneer" ? (
         <div className="grid gap-3">
           <div>
             <button className="btn-secondary" type="button" onClick={() => setStep("captains")}>
               Back to Captains
+            </button>
+          </div>
+          <div className="auction-fast-grid">
+            {players.map((player) => {
+              const captain = captainIds.has(player.id);
+              return (
+                <PlayerTile
+                  key={player.id}
+                  detail={captain ? "Captain - cannot auctioneer" : `@${player.username} - ${player.preferred_position}`}
+                  disabled={captain}
+                  onSelect={setAuctioneer}
+                  player={player}
+                  selected={auctioneer === player.id}
+                  status={auctioneer === player.id ? "REF" : undefined}
+                />
+              );
+            })}
+          </div>
+          <button className="btn-primary w-full sm:w-fit" disabled={!auctioneerPicked} type="button" onClick={() => setStep("players")}>
+            Next: Choose Auction Players
+          </button>
+          {!auctioneerPicked ? (
+            <div className="empty-state min-h-0">
+              Choose one auctioneer who is not a captain.
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          <div>
+            <button className="btn-secondary" type="button" onClick={() => setStep("auctioneer")}>
+              Back to Auctioneer
             </button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -248,15 +291,16 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, c
             {players.map((player) => {
               const checked = selected.has(player.id);
               const captain = captainIds.has(player.id);
+              const auctioneerSelected = auctioneer === player.id;
               return (
                 <PlayerTile
                   key={player.id}
-                  detail={captain ? "Captain - not in auction" : `@${player.username} - ${player.preferred_position}`}
-                  disabled={captain}
+                  detail={captain ? "Captain - not in auction" : auctioneerSelected ? "Auctioneer - not in auction" : `@${player.username} - ${player.preferred_position}`}
+                  disabled={captain || auctioneerSelected}
                   onSelect={togglePlayer}
                   player={player}
-                  selected={checked && !captain}
-                  status={checked && !captain ? "IN" : undefined}
+                  selected={checked && !captain && !auctioneerSelected}
+                  status={checked && !captain && !auctioneerSelected ? "IN" : undefined}
                 />
               );
             })}

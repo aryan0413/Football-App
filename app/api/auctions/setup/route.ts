@@ -7,15 +7,22 @@ export async function POST(request: Request) {
     const body = await request.json();
     const matchId = String(body.matchId ?? "");
     const teams = Array.isArray(body.teams) ? body.teams : [];
+    const auctioneerId = String(body.auctioneerId ?? "");
     const playerIds: string[] = Array.isArray(body.playerIds) ? body.playerIds.map((id: unknown) => String(id)).filter(Boolean) : [];
 
-    if (!matchId || teams.length < 2 || playerIds.length < 1) {
-      return Response.json({ error: "Choose two captains and at least one auction player." }, { status: 400 });
+    if (!matchId || teams.length < 2 || !auctioneerId || playerIds.length < 1) {
+      return Response.json({ error: "Choose two captains, one auctioneer, and at least one auction player." }, { status: 400 });
     }
 
     const captainIds = teams.map((team: any) => String(team.captainId ?? "")).filter(Boolean);
     if (captainIds.length < 2 || new Set(captainIds).size !== captainIds.length) {
       return Response.json({ error: "Choose two different captains." }, { status: 400 });
+    }
+    if (captainIds.includes(auctioneerId)) {
+      return Response.json({ error: "Auctioneer must be different from the captains." }, { status: 400 });
+    }
+    if (playerIds.includes(auctioneerId) || playerIds.some((playerId) => captainIds.includes(playerId))) {
+      return Response.json({ error: "Captains and auctioneer cannot be in the auction player pool." }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
@@ -40,7 +47,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Auction setup can only be changed before the auction starts." }, { status: 400 });
     }
 
-    const selectedUserIds = Array.from(new Set([...captainIds, ...playerIds]));
+    const selectedUserIds = Array.from(new Set([...captainIds, auctioneerId, ...playerIds]));
     const { data: groupMembers, error: memberError } = await supabase
       .from("group_members")
       .select("user_id")
@@ -87,6 +94,7 @@ export async function POST(request: Request) {
 
     const setupState = {
       ...emptyAuctionState("DRAFT"),
+      auctioneerId,
       order: Array.from(new Set(playerIds))
     };
     const { error: notesError } = await supabase

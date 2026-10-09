@@ -1,5 +1,5 @@
 import { jsonError, requireAppUser } from "@/lib/auth";
-import { getAuctionSnapshot, nextAuctionPlayerId, writeAuctionStateCas } from "@/lib/auctionLive";
+import { getAuctionSnapshot, nextAuctionPlayerId, parseAuctionState, writeAuctionStateCas } from "@/lib/auctionLive";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function POST(request: Request) {
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     const { data: match, error: matchError } = await supabase
       .from("matches")
-      .select("id, group_id")
+      .select("id, group_id, notes")
       .eq("id", matchId)
       .maybeSingle();
     if (matchError) throw matchError;
@@ -41,19 +41,26 @@ export async function POST(request: Request) {
 
     const captainTeam = (teams ?? []).find((team: any) => team.captain_id === user.id);
     const isOwnerOrAdmin = membership.role === "OWNER" || membership.role === "ADMIN";
-    if (!isOwnerOrAdmin && !captainTeam) {
-      return Response.json({ error: "Only the owner/admin and selected captains can join this auction room." }, { status: 403 });
+    const persistedState = parseAuctionState(match.notes, auction.status === "LIVE" ? "LIVE" : "DRAFT");
+    const auctioneerId = persistedState.auctioneerId;
+    const isAuctioneer = auctioneerId === user.id;
+    if (!isOwnerOrAdmin && !captainTeam && !isAuctioneer) {
+      return Response.json({ error: "Only selected captains and the auctioneer can join this auction room." }, { status: 403 });
     }
 
     const captainIds = (teams ?? []).map((team: any) => team.captain_id).filter(Boolean) as string[];
     const uniqueCaptainIds = new Set(captainIds);
+    const requiredReadyIds = Array.from(new Set([...captainIds, auctioneerId].filter(Boolean) as string[]));
 
     if (forceStart) {
-      if (!isOwnerOrAdmin) {
-        return Response.json({ error: "Only the owner/admin can start the auction." }, { status: 403 });
+      if (!isOwnerOrAdmin && !isAuctioneer) {
+        return Response.json({ error: "Only the group admin or selected auctioneer can start the auction." }, { status: 403 });
       }
       if (uniqueCaptainIds.size < 2) {
         return Response.json({ error: "Choose two captains before starting the auction." }, { status: 400 });
+      }
+      if (!auctioneerId) {
+        return Response.json({ error: "Choose one auctioneer before starting the auction." }, { status: 400 });
       }
 
       const { data: auctionPlayers, error: playerError } = await supabase
@@ -80,9 +87,9 @@ export async function POST(request: Request) {
       if (readyReadError) throw readyReadError;
 
       const readyIds = new Set((readyRows ?? []).map((row: any) => row.user_id));
-      const captainsReady = captainIds.every((id) => readyIds.has(id));
-      if (!captainsReady) {
-        return Response.json({ ok: true, status: auction.status, waitingForCaptains: true });
+      const roomReady = requiredReadyIds.length >= 3 && requiredReadyIds.every((id) => readyIds.has(id));
+      if (!roomReady) {
+        return Response.json({ ok: true, status: auction.status, waitingForRoom: true });
       }
 
       if (auction.status !== "LIVE") {
@@ -117,11 +124,9 @@ export async function POST(request: Request) {
     if (readyReadError) throw readyReadError;
 
     const readyIds = new Set((readyRows ?? []).map((row: any) => row.user_id));
-    const captainIdSet = new Set(captainIds);
-    const ownerReady = (readyRows ?? []).some((row: any) => !captainIdSet.has(row.user_id));
-    const captainsReady = captainIds.length >= 2 && captainIds.every((id) => readyIds.has(id));
+    const roomReady = requiredReadyIds.length >= 3 && requiredReadyIds.every((id) => readyIds.has(id));
 
-    if (ownerReady && new Set(captainIds).size >= 2 && captainsReady && auction.status !== "LIVE") {
+    if (new Set(captainIds).size >= 2 && auctioneerId && roomReady && auction.status !== "LIVE") {
       const { error: liveError } = await supabase
         .from("auctions")
         .update({ status: "LIVE" })

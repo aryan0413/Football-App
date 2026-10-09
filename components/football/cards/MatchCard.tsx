@@ -19,7 +19,7 @@ export function MatchCard({ match }: MatchCardProps) {
   const live = match.status === "LIVE";
   const auction = match.status === "AUCTION";
   const actionHref = auction ? `/auction?matchId=${match.id}` : `/match/${match.id}`;
-  const actionLabel = auction ? "Open Auction" : live ? "Live Match" : "View Match";
+  const actionLabel = auction ? "Join Back Auction" : live ? "Live Match" : "View Match";
 
   return (
     <article className="data-row grid gap-2.5 p-3 transition hover:border-[var(--accent)] hover:shadow-xl">

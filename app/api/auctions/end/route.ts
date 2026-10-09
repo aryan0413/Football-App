@@ -1,9 +1,15 @@
-import { jsonError, requireGroupRole } from "@/lib/auth";
-import { getAuctionSnapshot, writeAuctionStateCas } from "@/lib/auctionLive";
+import { jsonError, requireAppUser } from "@/lib/auth";
+import { getAuctionSnapshot, writeAuctionStateCas, type AuctionControlState } from "@/lib/auctionLive";
 import { getSupabaseAdmin } from "@/lib/supabase";
+
+function canRunAuction(userId: string, role: string, state: AuctionControlState) {
+  if (state.auctioneerId) return state.auctioneerId === userId;
+  return role === "OWNER" || role === "ADMIN";
+}
 
 export async function POST(request: Request) {
   try {
+    const user = await requireAppUser();
     const body = await request.json();
     const matchId = String(body.matchId ?? "");
 
@@ -21,8 +27,6 @@ export async function POST(request: Request) {
     if (matchError) throw matchError;
     if (!match) return Response.json({ error: "Match not found." }, { status: 404 });
 
-    await requireGroupRole(match.group_id, ["OWNER", "ADMIN"]);
-
     const { data: auction, error: auctionError } = await supabase
       .from("auctions")
       .select("id, status")
@@ -32,6 +36,17 @@ export async function POST(request: Request) {
     if (auctionError) throw auctionError;
     if (!auction) return Response.json({ error: "Auction not found." }, { status: 404 });
     const snapshot = await getAuctionSnapshot(supabase, matchId);
+    const { data: membership, error: memberError } = await supabase
+      .from("group_members")
+      .select("role")
+      .eq("group_id", match.group_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (memberError) throw memberError;
+    if (!membership) return Response.json({ error: "You are not in this group." }, { status: 403 });
+    if (!canRunAuction(user.id, membership.role, snapshot.state)) {
+      return Response.json({ error: "Only the selected auctioneer can complete the auction." }, { status: 403 });
+    }
     if (auction.status === "ENDED" || snapshot.state.status === "ENDED") {
       return Response.json({ error: "Auction is already completed." }, { status: 400 });
     }

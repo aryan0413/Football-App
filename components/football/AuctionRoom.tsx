@@ -29,14 +29,17 @@ type Snapshot = {
     status: "DRAFT" | "LIVE" | "PAUSED" | "ENDED";
     version: number;
     order: string[];
+    auctioneerId: string | null;
     currentPlayerId: string | null;
     currentBid: { id: string; playerId: string; teamId: string; amount: number; bidderUserId: string; createdAt: string } | null;
     completed: Record<string, { status: "SOLD" | "UNSOLD" | "SKIPPED"; playerId: string; teamId?: string | null; amount?: number; at: string }>;
     bidHistory: Array<{ id: string; playerId: string; teamId: string; amount: number; bidderUserId: string; createdAt: string }>;
+    undoStack: Array<{ id: string; action: string; at: string }>;
     updatedAt: string;
   };
   teams: Team[];
   selectedPlayers: Player[];
+  auctioneer?: Player | null;
   currentPlayer: Player | null;
   remainingPlayers: Player[];
   completedPlayers: Array<{ status: "SOLD" | "UNSOLD" | "SKIPPED"; playerId: string; teamId?: string | null; amount?: number; at: string; player: Player | null; teamName?: string | null }>;
@@ -66,10 +69,12 @@ function parseAuctionNotes(notes: unknown, fallback: Snapshot["state"]) {
       version: Number(parsed.version ?? fallback.version),
       status: isAuctionStatus(parsed.status) ? parsed.status : fallback.status,
       order: Array.isArray(parsed.order) ? parsed.order.filter((id: unknown) => typeof id === "string") : fallback.order,
+      auctioneerId: typeof parsed.auctioneerId === "string" ? parsed.auctioneerId : null,
       currentPlayerId: typeof parsed.currentPlayerId === "string" ? parsed.currentPlayerId : null,
       currentBid: parsed.currentBid && typeof parsed.currentBid === "object" ? parsed.currentBid : null,
       completed: parsed.completed && typeof parsed.completed === "object" ? parsed.completed : {},
       bidHistory: Array.isArray(parsed.bidHistory) ? parsed.bidHistory : fallback.bidHistory,
+      undoStack: Array.isArray(parsed.undoStack) ? parsed.undoStack : fallback.undoStack,
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : fallback.updatedAt
     } satisfies Snapshot["state"];
   } catch {
@@ -211,7 +216,6 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
   const paused = localStatus === "PAUSED";
   const ended = localStatus === "ENDED";
   const readyIds = new Set((snapshot.readyRows ?? []).map((row) => row.user_id));
-  const ownerReady = (snapshot.readyRows ?? []).some((row) => row.role === "OWNER");
   const captainTeams = localTeams.filter((team) => team.captain_id);
   const captainsReady = captainTeams.filter((team) => team.captain_id && readyIds.has(team.captain_id)).length;
   const currentUserReady = readyIds.has(currentUserId);
@@ -219,6 +223,11 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
   const currentPlayer = snapshot.currentPlayer;
   const highestTeam = localTeams.find((team) => team.id === currentBid?.teamId);
   const nextBid = nextRequiredBid(Number(currentBid?.amount ?? 0));
+  const auctioneer = snapshot.auctioneer ?? null;
+  const isAuctioneer = snapshot.state.auctioneerId === currentUserId;
+  const canRunAuction = isAuctioneer || (!snapshot.state.auctioneerId && canManage);
+  const canStartAuction = canManage || isAuctioneer;
+  const auctioneerReady = Boolean(snapshot.state.auctioneerId && readyIds.has(snapshot.state.auctioneerId));
 
   const currentTeamSpent = useMemo(() => {
     const map = new Map<string, number>();
@@ -249,18 +258,46 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
       return;
     }
     if (data.snapshot) setSnapshot(data.snapshot);
+    else if (data.state) setSnapshot((current) => applyAuctionState(current, data.state));
     setMessage(data.message ?? fallbackMessage);
     setBusyKey("");
     if (refreshAfter) startTransition(() => router.refresh());
   }
 
   async function placeBid() {
-    if (!currentPlayer) return;
+    if (!currentPlayer || !captainTeam || busyKey) return;
+    const amount = nextBid;
+    const optimisticId = `pending-${Date.now()}`;
+    const createdAt = new Date().toISOString();
+    setSnapshot((current) =>
+      applyAuctionState(current, {
+        ...current.state,
+        currentBid: {
+          id: optimisticId,
+          playerId: currentPlayer.id,
+          teamId: captainTeam.id,
+          amount,
+          bidderUserId: currentUserId,
+          createdAt
+        },
+        bidHistory: [
+          {
+            id: optimisticId,
+            playerId: currentPlayer.id,
+            teamId: captainTeam.id,
+            amount,
+            bidderUserId: currentUserId,
+            createdAt
+          },
+          ...current.state.bidHistory
+        ].slice(0, 250)
+      })
+    );
     await applyAction(
       "/api/auctions/bid",
-      { matchId, playerId: currentPlayer.id, amount: nextBid },
+      { matchId, playerId: currentPlayer.id, amount },
       "bid",
-      `Bid placed: INR ${formatAuctionMoney(nextBid)}.`
+      `Bid placed: INR ${formatAuctionMoney(amount)}.`
     );
   }
 
@@ -269,7 +306,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
       "/api/auctions/ready",
       { matchId, forceStart },
       forceStart ? "start" : "ready",
-      forceStart ? "Owner ready. Waiting for captains if needed." : "You are ready. Auction starts when everyone is ready."
+      forceStart ? "Waiting for both captains and the auctioneer." : "You are ready. Auction starts when both captains and the auctioneer are ready."
     );
   }
 
@@ -278,7 +315,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
     await applyAction("/api/auctions/sell", { matchId, playerId: currentPlayer.id }, "sell", "Player sold to highest bidder.");
   }
 
-  async function controlAuction(action: "PAUSE" | "RESUME" | "SKIP" | "UNSOLD") {
+  async function controlAuction(action: "STOP" | "RESUME" | "SKIP" | "UNSOLD" | "RESTART" | "UNDO") {
     await applyAction("/api/auctions/control", { matchId, action }, action.toLowerCase(), "Auction updated.");
   }
 
@@ -349,28 +386,35 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
               <div className="flex items-center gap-2"><Bell size={17} /> You are selected as captain for {captainTeam.name}. Your bids are saved live.</div>
             </div>
           ) : null}
+          {isAuctioneer ? (
+            <div className="rounded-lg border border-white/20 bg-white/12 p-3 text-sm font-black text-white">
+              <div className="flex items-center gap-2"><Gavel size={17} /> You are the auctioneer. Live controls are handed to you.</div>
+            </div>
+          ) : null}
 
           <div className="auction-room-status">
             <div>
-              <div className="text-xs font-black uppercase text-white/54">Owner/Admin</div>
-              <div className="font-black">{ownerReady ? "Ready" : "Waiting"}</div>
+              <div className="text-xs font-black uppercase text-white/54">Auctioneer</div>
+              <div className="truncate font-black">{auctioneer?.display_name ?? "Not selected"}</div>
             </div>
             <div>
               <div className="text-xs font-black uppercase text-white/54">Captains ready</div>
               <div className="font-black">{captainsReady}/{Math.max(2, captainTeams.length)}</div>
             </div>
             <div>
-              <div className="text-xs font-black uppercase text-white/54">Version</div>
-              <div className="font-black">#{snapshot.state.version}</div>
+              <div className="text-xs font-black uppercase text-white/54">Auctioneer ready</div>
+              <div className="font-black">{auctioneerReady ? "Ready" : "Waiting"}</div>
             </div>
           </div>
 
-          {!live && !paused && !ended && (canManage || captainTeam) ? (
+          {!live && !paused && !ended && (canStartAuction || captainTeam) ? (
             <div className="grid gap-2 sm:grid-cols-2">
-              <button className="btn-primary" disabled={currentUserReady || busyKey === "ready"} type="button" onClick={() => markReady(false)}>
-                <Check size={18} /> {currentUserReady ? "You are ready" : busyKey === "ready" ? "Joining..." : "Join / Ready"}
-              </button>
-              {canManage ? (
+              {captainTeam || isAuctioneer ? (
+                <button className="btn-primary" disabled={currentUserReady || busyKey === "ready"} type="button" onClick={() => markReady(false)}>
+                  <Check size={18} /> {currentUserReady ? "You are ready" : busyKey === "ready" ? "Joining..." : "Join Auction Room"}
+                </button>
+              ) : null}
+              {canStartAuction ? (
                 <button className="btn-secondary" disabled={busyKey === "start"} type="button" onClick={() => markReady(true)}>
                   <Gavel size={18} /> {busyKey === "start" ? "Starting..." : "Start Auction Now"}
                 </button>
@@ -389,7 +433,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
             </div>
             <div>
               <div className="text-xs font-black uppercase text-white/54">Your team</div>
-              <div className="truncate font-black">{captainTeam?.name ?? "Captain only"}</div>
+              <div className="truncate font-black">{captainTeam?.name ?? (isAuctioneer ? "Auctioneer" : "Captain only")}</div>
             </div>
           </div>
 
@@ -421,15 +465,21 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
             )}
           </div>
 
-          {canManage ? (
+          {canRunAuction ? (
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {live ? <button className="btn-secondary" disabled={Boolean(busyKey)} type="button" onClick={() => controlAuction("PAUSE")}><Pause size={17} /> Pause</button> : null}
+              {live ? <button className="btn-secondary" disabled={Boolean(busyKey)} type="button" onClick={() => controlAuction("STOP")}><Pause size={17} /> Stop</button> : null}
               {paused ? <button className="btn-primary" disabled={Boolean(busyKey)} type="button" onClick={() => controlAuction("RESUME")}><Play size={17} /> Resume</button> : null}
               <button className="btn-secondary" disabled={!currentPlayer || !currentBid || !live || Boolean(busyKey)} type="button" onClick={sellCurrentPlayer}><Check size={17} /> Sell</button>
               <button className="btn-secondary" disabled={!currentPlayer || !live || Boolean(busyKey)} type="button" onClick={() => controlAuction("UNSOLD")}><Ban size={17} /> Unsold</button>
               <button className="btn-secondary" disabled={!currentPlayer || !live || Boolean(busyKey)} type="button" onClick={() => controlAuction("SKIP")}><SkipForward size={17} /> Skip</button>
+              <button className="btn-secondary" disabled={!snapshot.state.undoStack.length || Boolean(busyKey)} type="button" onClick={() => controlAuction("UNDO")}><RotateCcw size={17} /> Undo</button>
+              <button className="btn-secondary" disabled={ended || Boolean(busyKey)} type="button" onClick={() => window.confirm("Restart auction? This clears sold players and bid history for this auction.") ? controlAuction("RESTART") : undefined}><RotateCcw size={17} /> Restart</button>
               <button className="btn-danger" disabled={ended || Boolean(busyKey)} type="button" onClick={completeAuction}><Check size={17} /> Complete</button>
               <button className="btn-secondary" disabled={Boolean(busyKey)} type="button" onClick={() => syncState(false)}><RotateCcw size={17} /> Sync</button>
+            </div>
+          ) : live || paused ? (
+            <div className="rounded-lg bg-white/10 p-3 text-sm font-bold text-white/72">
+              {snapshot.state.auctioneerId ? "The selected auctioneer controls sold, stop, restart, and undo actions." : "Auction controls are limited to admins until an auctioneer is selected."}
             </div>
           ) : null}
 

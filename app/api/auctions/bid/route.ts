@@ -1,5 +1,5 @@
 import { jsonError, requireAppUser } from "@/lib/auth";
-import { getAuctionSnapshot, minimumAuctionBid, parseAuctionState, writeAuctionStateCas } from "@/lib/auctionLive";
+import { minimumAuctionBid, parseAuctionState, pushAuctionUndo, writeAuctionStateCas } from "@/lib/auctionLive";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function POST(request: Request) {
@@ -15,66 +15,53 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabaseAdmin();
-    let snapshot;
-    try {
-      snapshot = await getAuctionSnapshot(supabase, matchId);
-    } catch (error) {
-      if (error instanceof Error && error.message === "Match not found.") {
-        return Response.json({ error: "Match not found." }, { status: 404 });
-      }
-      throw error;
-    }
+    const [{ data: match, error: matchError }, { data: auction, error: auctionError }, { data: captainTeam, error: captainError }] = await Promise.all([
+      supabase.from("matches").select("id, group_id, notes").eq("id", matchId).maybeSingle(),
+      supabase.from("auctions").select("id, status, starting_purse").eq("match_id", matchId).maybeSingle(),
+      supabase
+        .from("teams")
+        .select("id, name, captain_id, team_players(auction_price)")
+        .eq("match_id", matchId)
+        .eq("captain_id", user.id)
+        .maybeSingle()
+    ]);
 
-    const auction = snapshot.auction;
-    if (!auction || auction.status !== "LIVE" || snapshot.state.status !== "LIVE") {
+    if (matchError) throw matchError;
+    if (auctionError) throw auctionError;
+    if (captainError) throw captainError;
+    if (!match) return Response.json({ error: "Match not found." }, { status: 404 });
+    if (!auction) return Response.json({ error: "Auction not found." }, { status: 404 });
+    if (!captainTeam) return Response.json({ error: "Only selected captains can bid from their device." }, { status: 403 });
+
+    const state = parseAuctionState(match.notes, auction.status === "LIVE" ? "LIVE" : "DRAFT");
+    if (auction.status !== "LIVE" || state.status !== "LIVE") {
       return Response.json({ error: "Auction is not live." }, { status: 400 });
     }
-    if (snapshot.state.currentPlayerId !== playerId) {
+    if (state.currentPlayerId !== playerId) {
       return Response.json({ error: "You can bid only on the current auction player." }, { status: 400 });
     }
-
-    const { data: captainTeam, error: captainError } = await supabase
-      .from("teams")
-      .select("id, name, captain_id")
-      .eq("match_id", matchId)
-      .eq("captain_id", user.id)
-      .maybeSingle();
-    if (captainError) throw captainError;
-    if (!captainTeam) {
-      return Response.json({ error: "Only selected captains can bid from their device." }, { status: 403 });
+    if (!state.order.includes(playerId) || state.completed[playerId]) {
+      return Response.json({ error: "Player is not available for bidding." }, { status: 400 });
+    }
+    if (state.currentBid?.teamId === captainTeam.id) {
+      return Response.json({ error: "Your team is already the highest bidder." }, { status: 400 });
     }
 
     const { data: groupMember, error: memberError } = await supabase
       .from("group_members")
       .select("id")
-      .eq("group_id", snapshot.match.group_id)
+      .eq("group_id", match.group_id)
       .eq("user_id", playerId)
       .maybeSingle();
     if (memberError) throw memberError;
     if (!groupMember) return Response.json({ error: "Player is not in this group." }, { status: 400 });
 
-    const { data: auctionPlayer, error: auctionPlayerError } = await supabase
-      .from("match_availability")
-      .select("user_id")
-      .eq("match_id", matchId)
-      .eq("user_id", playerId)
-      .eq("status", "PLAYING")
-      .maybeSingle();
-    if (auctionPlayerError) throw auctionPlayerError;
-    if (!auctionPlayer) return Response.json({ error: "Player is not in the selected auction pool." }, { status: 400 });
-
-    if (snapshot.state.completed[playerId]) return Response.json({ error: "Player is already completed." }, { status: 400 });
-    if (snapshot.state.currentBid?.teamId === captainTeam.id) {
-      return Response.json({ error: "Your team is already the highest bidder." }, { status: 400 });
-    }
-
-    const minimum = minimumAuctionBid(snapshot.state.currentBid);
+    const minimum = minimumAuctionBid(state.currentBid);
     if (amount < minimum) {
       return Response.json({ error: `Minimum bid is ${minimum}.` }, { status: 400 });
     }
 
-    const team = snapshot.teams.find((item: any) => item.id === captainTeam.id);
-    const spent = (team?.team_players ?? []).reduce((sum: number, row: any) => sum + Number(row.auction_price ?? 0), 0);
+    const spent = (captainTeam.team_players ?? []).reduce((sum: number, row: any) => sum + Number(row.auction_price ?? 0), 0);
     const purse = Number(auction.starting_purse ?? 0);
     if (amount > purse - spent) {
       return Response.json({ error: "Bid exceeds your remaining purse." }, { status: 400 });
@@ -90,14 +77,15 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString()
     };
     const nextState = {
-      ...snapshot.state,
+      ...state,
       currentBid: bidState,
-      bidHistory: [bidState, ...snapshot.state.bidHistory].slice(0, 250)
+      bidHistory: [bidState, ...state.bidHistory].slice(0, 250),
+      undoStack: pushAuctionUndo(state, "BID", { bidId })
     };
-    const written = await writeAuctionStateCas(supabase, matchId, snapshot.match.notes ?? null, nextState);
+    const written = await writeAuctionStateCas(supabase, matchId, match.notes ?? null, nextState);
     if (!written) return Response.json({ error: "Another captain bid first. Syncing latest auction state." }, { status: 409 });
 
-    const { data: bid, error } = await supabase
+    const { error: bidError } = await supabase
       .from("auction_bids")
       .insert({
         id: bidId,
@@ -105,20 +93,13 @@ export async function POST(request: Request) {
         player_id: playerId,
         team_id: captainTeam.id,
         amount
-      })
-      .select("*")
-      .single();
+      });
 
-    if (error) throw error;
     const savedState = parseAuctionState(written.notes, "LIVE");
     return Response.json({
-      bid,
-      snapshot: {
-        ...snapshot,
-        match: { ...snapshot.match, notes: written.notes },
-        state: savedState,
-        bids: [{ ...bid, teams: { name: captainTeam.name } }, ...(snapshot.bids ?? [])]
-      }
+      bid: bidState,
+      state: savedState,
+      message: bidError ? "Bid saved live. Bid log will resync." : "Bid placed."
     });
   } catch (error) {
     return jsonError(error);

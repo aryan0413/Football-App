@@ -1,9 +1,15 @@
-import { jsonError, requireGroupRole } from "@/lib/auth";
-import { advanceAuctionState, getAuctionSnapshot, writeAuctionStateCas } from "@/lib/auctionLive";
+import { jsonError, requireAppUser } from "@/lib/auth";
+import { advanceAuctionState, getAuctionSnapshot, pushAuctionUndo, writeAuctionStateCas, type AuctionControlState } from "@/lib/auctionLive";
 import { getSupabaseAdmin } from "@/lib/supabase";
+
+function canRunAuction(userId: string, role: string, state: AuctionControlState) {
+  if (state.auctioneerId) return state.auctioneerId === userId;
+  return role === "OWNER" || role === "ADMIN";
+}
 
 export async function POST(request: Request) {
   try {
+    const user = await requireAppUser();
     const body = await request.json();
     const matchId = String(body.matchId ?? "");
     const playerId = String(body.playerId ?? "");
@@ -21,9 +27,19 @@ export async function POST(request: Request) {
     if (matchError) throw matchError;
     if (!match) return Response.json({ error: "Match not found." }, { status: 404 });
 
-    await requireGroupRole(match.group_id, ["OWNER", "ADMIN"]);
-
     const snapshot = await getAuctionSnapshot(supabase, matchId);
+    const { data: membership, error: memberError } = await supabase
+      .from("group_members")
+      .select("role")
+      .eq("group_id", match.group_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (memberError) throw memberError;
+    if (!membership) return Response.json({ error: "You are not in this group." }, { status: 403 });
+    if (!canRunAuction(user.id, membership.role, snapshot.state)) {
+      return Response.json({ error: "Only the selected auctioneer can sell players." }, { status: 403 });
+    }
+
     const auction = snapshot.auction;
     if (!auction) return Response.json({ error: "Auction not found." }, { status: 404 });
     if (auction.status !== "LIVE" || snapshot.state.status !== "LIVE") return Response.json({ error: "Auction is not live." }, { status: 400 });
@@ -56,7 +72,12 @@ export async function POST(request: Request) {
         at: new Date().toISOString()
       }
     };
-    const nextState = advanceAuctionState({ ...snapshot.state, completed, currentBid: null }, selectedIds);
+    const nextState = advanceAuctionState({
+      ...snapshot.state,
+      completed,
+      currentBid: null,
+      undoStack: pushAuctionUndo(snapshot.state, "SELL", { teamPlayer: { teamId: highestBid.teamId, playerId } })
+    }, selectedIds);
     const written = await writeAuctionStateCas(supabase, matchId, snapshot.match.notes ?? null, nextState);
     if (!written) return Response.json({ error: "Auction changed. Sync and try again." }, { status: 409 });
 

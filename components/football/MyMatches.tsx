@@ -37,7 +37,7 @@ export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches:
   const selected = localMatches.find((match) => match.id === selectedId) ?? localMatches[0];
   const selectedIsAuction = selected?.status === "AUCTION";
   const selectedHref = selectedIsAuction ? `/auction?matchId=${selected.id}` : selected ? `/match/${selected.id}` : "#";
-  const selectedActionLabel = selectedIsAuction ? "Open auction room" : selected?.status === "LIVE" ? "Live now" : "Open match room";
+  const selectedActionLabel = selectedIsAuction ? "Join back auction" : selected?.status === "LIVE" ? "Live now" : "Open match room";
 
   const selectedScore = useMemo(() => {
     const teamA = selected?.teams?.[0];

@@ -1,7 +1,7 @@
 "use client";
 
 import { fallbackPhoto, optimizedPhotoUrl } from "@/lib/images";
-import { Gavel, Search, Send, ShieldCheck, Trophy, Users } from "lucide-react";
+import { Gavel, Search, Send, ShieldCheck, Trophy, UserMinus, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MatchCard } from "@/components/football/cards/MatchCard";
@@ -102,6 +102,22 @@ export function GroupRoom({ group, role, members, matches, leaderboard, initialP
       return;
     }
     setMessage(nextRole === "ADMIN" ? "Player made group admin." : "Admin changed back to player.");
+    router.refresh();
+  }
+
+  async function removeMember(userId: string, name: string) {
+    if (!window.confirm(`Remove ${name} from ${group.name}?`)) return;
+    const response = await fetch("/api/groups/members", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupId: group.id, userId })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setMessage(data.error ?? "Could not remove member.");
+      return;
+    }
+    setMessage("Member removed from group.");
     router.refresh();
   }
 
@@ -225,6 +241,11 @@ export function GroupRoom({ group, role, members, matches, leaderboard, initialP
                       Remove Admin
                     </button>
                   ) : null}
+                  {canManage && member.role !== "OWNER" && (role === "OWNER" || member.role === "PLAYER") ? (
+                    <button className="btn-danger w-full sm:w-fit" type="button" onClick={() => removeMember(member.users.id, member.users.display_name)}>
+                      <UserMinus size={17} /> Remove
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -260,7 +281,7 @@ export function GroupRoom({ group, role, members, matches, leaderboard, initialP
               <p className="text-xs font-black uppercase tracking-wide text-white/62">Auction</p>
               <h2 className="text-2xl font-black text-white">Build Teams</h2>
               <p className="mt-2 text-sm text-white/68">{activeAuction ? "Continue the active auction for this group." : "Finalize availability, then start an auction for this group."}</p>
-              <button className="btn-primary mt-5 w-full" disabled={auctionStarting} type="button" onClick={startAuction}><Gavel size={18} /> {auctionStarting ? "Starting..." : activeAuction ? "Open Auction" : "Start Auction"}</button>
+              <button className="btn-primary mt-5 w-full" disabled={auctionStarting} type="button" onClick={startAuction}><Gavel size={18} /> {auctionStarting ? "Starting..." : activeAuction ? "Join Back Auction" : "Start Auction"}</button>
             </div>
           </div>
           <div className="surface p-3 sm:p-4">

@@ -2,7 +2,7 @@ import { AuctionHub } from "@/components/football/AuctionHub";
 import { AuctionRoom } from "@/components/football/AuctionRoom";
 import { AuctionSetupForm } from "@/components/football/AuctionSetupForm";
 import { ScheduleAuctionMatchForm } from "@/components/football/ScheduleAuctionMatchForm";
-import { getAuctionSnapshot } from "@/lib/auctionLive";
+import { getAuctionSnapshot, parseAuctionState } from "@/lib/auctionLive";
 import { getCurrentAppUser } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { uniqueNamedTeams } from "@/lib/teams";
@@ -56,7 +56,7 @@ export default async function AuctionPage({ searchParams }: { searchParams: Prom
 
   const { data: match } = await supabase
     .from("matches")
-    .select("id, group_id, scheduled_date, match_time, location, maximum_players, status, groups(name)")
+    .select("id, group_id, scheduled_date, match_time, location, maximum_players, status, notes, groups(name)")
     .eq("id", matchId)
     .maybeSingle();
 
@@ -116,7 +116,8 @@ export default async function AuctionPage({ searchParams }: { searchParams: Prom
   const allGroupPlayers = (groupPlayers ?? []).map((row: any) => row.users).filter(Boolean);
   const selectedPlayerIds = (confirmedPlayers ?? []).map((row: any) => row.users?.id).filter(Boolean);
   const captainIds = setupTeams.map((team: any) => team.captain_id).filter(Boolean);
-  const setupComplete = new Set(captainIds).size >= 2 && selectedPlayerIds.length >= 1;
+  const setupState = parseAuctionState((match as any).notes, auction?.status === "LIVE" ? "LIVE" : "DRAFT");
+  const setupComplete = new Set(captainIds).size >= 2 && Boolean(setupState.auctioneerId) && selectedPlayerIds.length >= 1;
 
   const header = (
     <header className="flex flex-wrap items-end justify-between gap-3 py-3 text-white">
@@ -138,6 +139,7 @@ export default async function AuctionPage({ searchParams }: { searchParams: Prom
           teams={setupTeams as any}
           players={allGroupPlayers as any}
           selectedPlayerIds={selectedPlayerIds as any}
+          auctioneerId={setupState.auctioneerId}
           canManage={canManage}
         />
       </div>
