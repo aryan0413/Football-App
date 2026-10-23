@@ -21,7 +21,7 @@ export function AuthActions() {
         </SignUpButton>
       </Show>
       <Show when="signed-in">
-        <UserButton />
+        <UserButton appearance={{ elements: { avatarBox: { width: 32, height: 32 } } }} />
       </Show>
     </div>
   );

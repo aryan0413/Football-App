@@ -1,9 +1,23 @@
 "use client";
 
 import { AUCTION_BASE_PRICE, formatAuctionMoney, nextRequiredBid } from "@/lib/auctionRules";
-import { fallbackPhoto, optimizedPhotoUrl } from "@/lib/images";
+import { PlayerAvatar } from "@/components/football/PlayerAvatar";
 import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
-import { Ban, Bell, Check, Gavel, Lock, Pause, Play, RotateCcw, SkipForward, Trophy, Users, Wifi, WifiOff, Zap } from "lucide-react";
+import {
+  Ban,
+  Bell,
+  Check,
+  Gavel,
+  Lock,
+  Pause,
+  Play,
+  RotateCcw,
+  SkipForward,
+  Trophy,
+  Wifi,
+  WifiOff,
+  Zap
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
@@ -31,9 +45,26 @@ type Snapshot = {
     order: string[];
     auctioneerId: string | null;
     currentPlayerId: string | null;
-    currentBid: { id: string; playerId: string; teamId: string; amount: number; bidderUserId: string; createdAt: string } | null;
-    completed: Record<string, { status: "SOLD" | "UNSOLD" | "SKIPPED"; playerId: string; teamId?: string | null; amount?: number; at: string }>;
-    bidHistory: Array<{ id: string; playerId: string; teamId: string; amount: number; bidderUserId: string; createdAt: string }>;
+    currentBid: {
+      id: string;
+      playerId: string;
+      teamId: string;
+      amount: number;
+      bidderUserId: string;
+      createdAt: string;
+    } | null;
+    completed: Record<
+      string,
+      { status: "SOLD" | "UNSOLD" | "SKIPPED"; playerId: string; teamId?: string | null; amount?: number; at: string }
+    >;
+    bidHistory: Array<{
+      id: string;
+      playerId: string;
+      teamId: string;
+      amount: number;
+      bidderUserId: string;
+      createdAt: string;
+    }>;
     undoStack: Array<{ id: string; action: string; at: string }>;
     updatedAt: string;
   };
@@ -42,7 +73,15 @@ type Snapshot = {
   auctioneer?: Player | null;
   currentPlayer: Player | null;
   remainingPlayers: Player[];
-  completedPlayers: Array<{ status: "SOLD" | "UNSOLD" | "SKIPPED"; playerId: string; teamId?: string | null; amount?: number; at: string; player: Player | null; teamName?: string | null }>;
+  completedPlayers: Array<{
+    status: "SOLD" | "UNSOLD" | "SKIPPED";
+    playerId: string;
+    teamId?: string | null;
+    amount?: number;
+    at: string;
+    player: Player | null;
+    teamName?: string | null;
+  }>;
   readyRows: Array<{ user_id: string; role: string }>;
 };
 
@@ -68,7 +107,9 @@ function parseAuctionNotes(notes: unknown, fallback: Snapshot["state"]) {
       ...fallback,
       version: Number(parsed.version ?? fallback.version),
       status: isAuctionStatus(parsed.status) ? parsed.status : fallback.status,
-      order: Array.isArray(parsed.order) ? parsed.order.filter((id: unknown) => typeof id === "string") : fallback.order,
+      order: Array.isArray(parsed.order)
+        ? parsed.order.filter((id: unknown) => typeof id === "string")
+        : fallback.order,
       auctioneerId: typeof parsed.auctioneerId === "string" ? parsed.auctioneerId : null,
       currentPlayerId: typeof parsed.currentPlayerId === "string" ? parsed.currentPlayerId : null,
       currentBid: parsed.currentBid && typeof parsed.currentBid === "object" ? parsed.currentBid : null,
@@ -86,17 +127,16 @@ function applyAuctionState(snapshot: Snapshot, state: Snapshot["state"]) {
   const playerById = new Map(snapshot.selectedPlayers.map((player) => [player.id, player]));
   const teamNameById = new Map(snapshot.teams.map((team) => [team.id, team.name]));
   const order = state.order.length ? state.order : snapshot.selectedPlayers.map((player) => player.id);
-  const currentPlayer = state.currentPlayerId ? playerById.get(state.currentPlayerId) ?? null : null;
+  const currentPlayer = state.currentPlayerId ? (playerById.get(state.currentPlayerId) ?? null) : null;
   const remainingPlayers = order
     .filter((playerId) => playerId !== state.currentPlayerId && !state.completed[playerId])
     .map((playerId) => playerById.get(playerId))
     .filter((player): player is Player => Boolean(player));
-  const completedPlayers = Object.values(state.completed)
-    .map((item) => ({
-      ...item,
-      player: playerById.get(item.playerId) ?? null,
-      teamName: item.teamId ? teamNameById.get(item.teamId) ?? null : null
-    }));
+  const completedPlayers = Object.values(state.completed).map((item) => ({
+    ...item,
+    player: playerById.get(item.playerId) ?? null,
+    teamName: item.teamId ? (teamNameById.get(item.teamId) ?? null) : null
+  }));
 
   return {
     ...snapshot,
@@ -126,21 +166,26 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
 
   useEffect(() => setSnapshot(initialSnapshot), [initialSnapshot, setSnapshot]);
 
-  const syncState = useCallback(async (silent = true) => {
-    try {
-      const response = await fetch(`/api/auctions/state?matchId=${encodeURIComponent(matchId)}`, { cache: "no-store" });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        if (!silent) setMessage(data.error ?? "Could not sync auction.");
-        return;
+  const syncState = useCallback(
+    async (silent = true) => {
+      try {
+        const response = await fetch(`/api/auctions/state?matchId=${encodeURIComponent(matchId)}`, {
+          cache: "no-store"
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (!silent) setMessage(data.error ?? "Could not sync auction.");
+          return;
+        }
+        if (data.snapshot) setSnapshot(data.snapshot);
+        setConnection(navigator.onLine ? "live" : "offline");
+      } catch {
+        setConnection(navigator.onLine ? "reconnecting" : "offline");
+        if (!silent) setMessage("Connection lost. Reconnecting to latest auction state.");
       }
-      if (data.snapshot) setSnapshot(data.snapshot);
-      setConnection(navigator.onLine ? "live" : "offline");
-    } catch {
-      setConnection(navigator.onLine ? "reconnecting" : "offline");
-      if (!silent) setMessage("Connection lost. Reconnecting to latest auction state.");
-    }
-  }, [matchId]);
+    },
+    [matchId]
+  );
 
   useEffect(() => {
     let active = true;
@@ -232,7 +277,10 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
   const currentTeamSpent = useMemo(() => {
     const map = new Map<string, number>();
     localTeams.forEach((team) => {
-      map.set(team.id, (team.team_players ?? []).reduce((sum, row) => sum + Number(row.auction_price ?? 0), 0));
+      map.set(
+        team.id,
+        (team.team_players ?? []).reduce((sum, row) => sum + Number(row.auction_price ?? 0), 0)
+      );
     });
     return map;
   }, [localTeams]);
@@ -241,27 +289,40 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
     return currentTeamSpent.get(team.id) ?? 0;
   }
 
-  async function applyAction(endpoint: string, payload: Record<string, unknown>, key: string, fallbackMessage: string, refreshAfter = false) {
-    if (busyKey) return;
+  async function applyAction(
+    endpoint: string,
+    payload: Record<string, unknown>,
+    key: string,
+    fallbackMessage: string,
+    refreshAfter = false
+  ) {
+    if (busyKey) return false;
     setBusyKey(key);
     setMessage("");
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setMessage(data.error ?? fallbackMessage);
-      setBusyKey("");
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setMessage(data.error ?? "Could not complete that action. Please try again.");
+        await syncState(true);
+        return false;
+      }
+      if (data.snapshot) setSnapshot(data.snapshot);
+      else if (data.state) setSnapshot((current) => applyAuctionState(current, data.state));
+      setMessage(data.message ?? fallbackMessage);
+      if (refreshAfter) startTransition(() => router.refresh());
+      return true;
+    } catch {
+      setMessage("Connection interrupted. Reconnecting to the auction...");
       await syncState(true);
-      return;
+      return false;
+    } finally {
+      setBusyKey("");
     }
-    if (data.snapshot) setSnapshot(data.snapshot);
-    else if (data.state) setSnapshot((current) => applyAuctionState(current, data.state));
-    setMessage(data.message ?? fallbackMessage);
-    setBusyKey("");
-    if (refreshAfter) startTransition(() => router.refresh());
   }
 
   async function placeBid() {
@@ -269,6 +330,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
     const amount = nextBid;
     const optimisticId = `pending-${Date.now()}`;
     const createdAt = new Date().toISOString();
+    const previousSnapshot = snapshotRef.current;
     setSnapshot((current) =>
       applyAuctionState(current, {
         ...current.state,
@@ -293,12 +355,15 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
         ].slice(0, 250)
       })
     );
-    await applyAction(
+    const accepted = await applyAction(
       "/api/auctions/bid",
       { matchId, playerId: currentPlayer.id, amount },
       "bid",
       `Bid placed: INR ${formatAuctionMoney(amount)}.`
     );
+    if (!accepted) {
+      setSnapshot((current) => (current.state.currentBid?.id === optimisticId ? previousSnapshot : current));
+    }
   }
 
   async function markReady(forceStart = false) {
@@ -340,7 +405,9 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="truncate font-black">{team.name}</h2>
-                  <p className="truncate text-sm font-bold text-[var(--muted)]">Captain: {team.captain?.display_name ?? "Not selected"}</p>
+                  <p className="truncate text-sm font-bold text-[var(--muted)]">
+                    Captain: {team.captain?.display_name ?? "Not selected"}
+                  </p>
                 </div>
                 <Trophy size={20} />
               </div>
@@ -355,12 +422,16 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
                 </div>
               </div>
               <div className="auction-team-roster mt-3">
-                {(team.team_players ?? []).map((row) => row.users ? (
-                  <div key={row.users.id} className="data-row flex items-center justify-between gap-3 p-2">
-                    <span className="truncate text-sm font-black">{row.users.display_name}</span>
-                    <span className="text-xs font-black text-[var(--muted)]">INR {formatAuctionMoney(Number(row.auction_price ?? 0))}</span>
-                  </div>
-                ) : null)}
+                {(team.team_players ?? []).map((row) =>
+                  row.users ? (
+                    <div key={row.users.id} className="data-row flex items-center justify-between gap-3 p-2">
+                      <span className="truncate text-sm font-black">{row.users.display_name}</span>
+                      <span className="text-xs font-black text-[var(--muted)]">
+                        INR {formatAuctionMoney(Number(row.auction_price ?? 0))}
+                      </span>
+                    </div>
+                  ) : null
+                )}
                 {!team.team_players?.length ? <div className="empty-state min-h-0">Empty squad</div> : null}
               </div>
             </div>
@@ -372,7 +443,15 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
         <div className="auction-command-inner">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-wide text-white/62">{live ? "Captain bidding room" : paused ? "Auction paused" : ended ? "Final result" : "Auction waiting room"}</p>
+              <p className="text-xs font-black uppercase tracking-wide text-white/62">
+                {live
+                  ? "Captain bidding room"
+                  : paused
+                    ? "Auction paused"
+                    : ended
+                      ? "Final result"
+                      : "Auction waiting room"}
+              </p>
               <h2 className="text-3xl font-black text-white">{localStatus}</h2>
             </div>
             <div className="flex items-center gap-2 text-xs font-black uppercase text-white/70">
@@ -383,39 +462,57 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
 
           {captainTeam ? (
             <div className="rounded-lg border border-[rgba(242,185,75,0.45)] bg-[rgba(242,185,75,0.16)] p-3 text-sm font-black text-white">
-              <div className="flex items-center gap-2"><Bell size={17} /> Captain: {captainTeam.name}</div>
+              <div className="flex items-center gap-2">
+                <Bell size={17} /> Captain: {captainTeam.name}
+              </div>
             </div>
           ) : null}
           {isAuctioneer ? (
             <div className="rounded-lg border border-white/20 bg-white/12 p-3 text-sm font-black text-white">
-              <div className="flex items-center gap-2"><Gavel size={17} /> Auctioneer controls active</div>
+              <div className="flex items-center gap-2">
+                <Gavel size={17} /> Auctioneer controls active
+              </div>
             </div>
           ) : null}
 
-          <div className="auction-room-status">
-            <div>
-              <div className="text-xs font-black uppercase text-white/54">Auctioneer</div>
-              <div className="truncate font-black">{auctioneer?.display_name ?? "Not selected"}</div>
+          {!live && !paused && !ended ? (
+            <div className="auction-room-status">
+              <div>
+                <div className="text-xs font-black uppercase text-white/54">Auctioneer</div>
+                <div className="truncate font-black">{auctioneer?.display_name ?? "Not selected"}</div>
+              </div>
+              <div>
+                <div className="text-xs font-black uppercase text-white/54">Captains ready</div>
+                <div className="font-black">
+                  {captainsReady}/{Math.max(2, captainTeams.length)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-black uppercase text-white/54">Auctioneer ready</div>
+                <div className="font-black">{auctioneerReady ? "Ready" : "Waiting"}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-xs font-black uppercase text-white/54">Captains ready</div>
-              <div className="font-black">{captainsReady}/{Math.max(2, captainTeams.length)}</div>
-            </div>
-            <div>
-              <div className="text-xs font-black uppercase text-white/54">Auctioneer ready</div>
-              <div className="font-black">{auctioneerReady ? "Ready" : "Waiting"}</div>
-            </div>
-          </div>
+          ) : null}
 
           {!live && !paused && !ended && (canStartAuction || captainTeam) ? (
             <div className="grid gap-2 sm:grid-cols-2">
               {captainTeam || isAuctioneer ? (
-                <button className="btn-primary" disabled={currentUserReady || busyKey === "ready"} type="button" onClick={() => markReady(false)}>
+                <button
+                  className="btn-primary"
+                  disabled={currentUserReady || busyKey === "ready"}
+                  type="button"
+                  onClick={() => markReady(false)}
+                >
                   <Check size={18} /> {currentUserReady ? "Ready" : busyKey === "ready" ? "Joining..." : "Join Room"}
                 </button>
               ) : null}
               {canStartAuction ? (
-                <button className="btn-secondary" disabled={busyKey === "start"} type="button" onClick={() => markReady(true)}>
+                <button
+                  className="btn-secondary"
+                  disabled={busyKey === "start"}
+                  type="button"
+                  onClick={() => markReady(true)}
+                >
                   <Gavel size={18} /> {busyKey === "start" ? "Starting..." : "Start Auction Now"}
                 </button>
               ) : null}
@@ -433,49 +530,147 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
             </div>
             <div>
               <div className="text-xs font-black uppercase text-white/54">Your team</div>
-              <div className="truncate font-black">{captainTeam?.name ?? (isAuctioneer ? "Auctioneer" : "No team")}</div>
+              <div className="truncate font-black">
+                {captainTeam?.name ?? (isAuctioneer ? "Auctioneer" : "No team")}
+              </div>
             </div>
           </div>
 
-          <div className="rounded-lg bg-white/12 p-3 text-white">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-black uppercase tracking-wide text-white/54">Current player</p>
-                <h3 className="text-2xl font-black">{currentPlayer?.display_name ?? (ended ? "Auction complete" : "Waiting for player")}</h3>
-              </div>
-              {live ? <Gavel size={30} /> : <Lock size={30} />}
-            </div>
+          <div className="auction-current-player">
             {currentPlayer ? (
-              <div className="grid gap-3 md:grid-cols-[auto_1fr_auto] md:items-center">
-                <img src={optimizedPhotoUrl(currentPlayer.profile_image, 128) ?? fallbackPhoto()} alt="" loading="lazy" decoding="async" className="h-20 w-20 rounded-lg object-cover" />
-                <div className="min-w-0">
-                  <div className="truncate text-lg font-black">@{currentPlayer.username} - {currentPlayer.preferred_position}</div>
-                  <div className="mt-1 text-sm font-bold text-white/66">
-                    Highest: {currentBid ? `INR ${formatAuctionMoney(currentBid.amount)} by ${highestTeam?.name ?? "Team"}` : "No bid yet"}
+              <>
+                <div className="auction-player-identity">
+                  <PlayerAvatar
+                    key={currentPlayer.id}
+                    src={currentPlayer.profile_image}
+                    name={currentPlayer.display_name}
+                    size={80}
+                    eager
+                  />
+                  <div className="min-w-0">
+                    <p className="eyebrow">On the block</p>
+                    <h3>{currentPlayer.display_name}</h3>
+                    <span className="position-chip">{currentPlayer.preferred_position}</span>
                   </div>
                 </div>
-                <button className="btn-primary" disabled={!live || !captainTeam || currentBid?.teamId === captainTeam?.id || Boolean(busyKey)} type="button" onClick={placeBid}>
-                  <Zap size={17} /> {busyKey === "bid" ? "Bidding..." : `Bid INR ${formatAuctionMoney(nextBid)}`}
+                <div className="auction-bid-display" aria-live="polite" aria-atomic="true">
+                  <small>{currentBid ? "Highest bid" : "Opening price"}</small>
+                  <strong>INR {formatAuctionMoney(currentBid?.amount ?? AUCTION_BASE_PRICE)}</strong>
+                  <span>{currentBid ? (highestTeam?.name ?? "Team") : "Awaiting first bid"}</span>
+                </div>
+                <button
+                  className="btn-primary auction-bid-button"
+                  disabled={
+                    !live ||
+                    !captainTeam ||
+                    connection === "offline" ||
+                    currentBid?.teamId === captainTeam?.id ||
+                    Boolean(busyKey) ||
+                    nextBid > startingPurse - teamSpent(captainTeam)
+                  }
+                  type="button"
+                  onClick={placeBid}
+                >
+                  <Zap size={17} />{" "}
+                  {busyKey === "bid"
+                    ? "Placing bid..."
+                    : currentBid?.teamId === captainTeam?.id
+                      ? "You hold the highest bid"
+                      : `Bid INR ${formatAuctionMoney(nextBid)}`}
                 </button>
-              </div>
+              </>
             ) : (
-              <div className="rounded-lg bg-white/10 p-4 text-sm font-bold text-white/72">
-                {ended ? "Final squads saved." : "Player reveal pending."}
+              <div className="empty-state">
+                <div>
+                  <Trophy size={28} className="mx-auto mb-3 text-[var(--accent)]" />
+                  <p>{ended ? "Auction complete. Final squads confirmed." : "Waiting for the auction to begin."}</p>
+                </div>
               </div>
             )}
           </div>
 
           {canRunAuction ? (
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {live ? <button className="btn-secondary" disabled={Boolean(busyKey)} type="button" onClick={() => controlAuction("STOP")}><Pause size={17} /> Stop</button> : null}
-              {paused ? <button className="btn-primary" disabled={Boolean(busyKey)} type="button" onClick={() => controlAuction("RESUME")}><Play size={17} /> Resume</button> : null}
-              <button className="btn-secondary" disabled={!currentPlayer || !currentBid || !live || Boolean(busyKey)} type="button" onClick={sellCurrentPlayer}><Check size={17} /> Sell</button>
-              <button className="btn-secondary" disabled={!currentPlayer || !live || Boolean(busyKey)} type="button" onClick={() => controlAuction("UNSOLD")}><Ban size={17} /> Unsold</button>
-              <button className="btn-secondary" disabled={!currentPlayer || !live || Boolean(busyKey)} type="button" onClick={() => controlAuction("SKIP")}><SkipForward size={17} /> Skip</button>
-              <button className="btn-secondary" disabled={!snapshot.state.undoStack.length || Boolean(busyKey)} type="button" onClick={() => controlAuction("UNDO")}><RotateCcw size={17} /> Undo</button>
-              <button className="btn-secondary" disabled={ended || Boolean(busyKey)} type="button" onClick={() => window.confirm("Restart auction? This clears sold players and bid history for this auction.") ? controlAuction("RESTART") : undefined}><RotateCcw size={17} /> Restart</button>
-              <button className="btn-danger" disabled={ended || Boolean(busyKey)} type="button" onClick={completeAuction}><Check size={17} /> Complete</button>
-              <button className="btn-secondary" disabled={Boolean(busyKey)} type="button" onClick={() => syncState(false)}><RotateCcw size={17} /> Sync</button>
+            <div className="auction-control-grid">
+              {live ? (
+                <button
+                  className="btn-secondary"
+                  disabled={Boolean(busyKey)}
+                  type="button"
+                  onClick={() => controlAuction("STOP")}
+                >
+                  <Pause size={17} /> Stop
+                </button>
+              ) : null}
+              {paused ? (
+                <button
+                  className="btn-primary"
+                  disabled={Boolean(busyKey)}
+                  type="button"
+                  onClick={() => controlAuction("RESUME")}
+                >
+                  <Play size={17} /> Resume
+                </button>
+              ) : null}
+              <button
+                className="btn-secondary"
+                disabled={!currentPlayer || !currentBid || !live || Boolean(busyKey)}
+                type="button"
+                onClick={sellCurrentPlayer}
+              >
+                <Check size={17} /> Sell
+              </button>
+              <button
+                className="btn-secondary"
+                disabled={!currentPlayer || !live || Boolean(busyKey)}
+                type="button"
+                onClick={() => controlAuction("UNSOLD")}
+              >
+                <Ban size={17} /> Unsold
+              </button>
+              <button
+                className="btn-secondary"
+                disabled={!currentPlayer || !live || Boolean(busyKey)}
+                type="button"
+                onClick={() => controlAuction("SKIP")}
+              >
+                <SkipForward size={17} /> Skip
+              </button>
+              <button
+                className="btn-secondary"
+                disabled={!snapshot.state.undoStack.length || Boolean(busyKey)}
+                type="button"
+                onClick={() => controlAuction("UNDO")}
+              >
+                <RotateCcw size={17} /> Undo
+              </button>
+              <button
+                className="btn-secondary"
+                disabled={ended || Boolean(busyKey)}
+                type="button"
+                onClick={() =>
+                  window.confirm("Restart auction? This clears sold players and bid history for this auction.")
+                    ? controlAuction("RESTART")
+                    : undefined
+                }
+              >
+                <RotateCcw size={17} /> Restart
+              </button>
+              <button
+                className="btn-danger"
+                disabled={ended || Boolean(busyKey)}
+                type="button"
+                onClick={completeAuction}
+              >
+                <Check size={17} /> Complete
+              </button>
+              <button
+                className="btn-secondary"
+                disabled={Boolean(busyKey)}
+                type="button"
+                onClick={() => syncState(false)}
+              >
+                <RotateCcw size={17} /> Sync
+              </button>
             </div>
           ) : live || paused ? (
             <div className="rounded-lg bg-white/10 p-3 text-sm font-bold text-white/72">
@@ -483,48 +678,79 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
             </div>
           ) : null}
 
-          <div className="grid gap-2">
-            <div className="flex items-center justify-between gap-2 font-black text-white">
-              <span className="inline-flex items-center gap-2"><Lock size={18} /> Sealed queue</span>
-              <span className="text-sm text-white/64">{snapshot.remainingPlayers.length} remaining</span>
+          <div className="auction-progress">
+            <div className="auction-progress-heading">
+              <span>
+                {snapshot.completedPlayers.length} of {snapshot.selectedPlayers.length} players completed
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Lock size={11} />
+                {snapshot.remainingPlayers.length} remaining
+              </span>
             </div>
-            <div className="rounded-lg border border-white/15 bg-white/10 p-4 text-sm font-bold text-white/72">
-              <div className="flex items-center gap-3">
-                <Users size={18} />
-                <span>
-                  {snapshot.remainingPlayers.length
-                    ? "Queue sealed. Next player reveals after the round."
-                    : "No remaining hidden players."}
-                </span>
-              </div>
+            <div className="auction-progress-track">
+              <span
+                style={{
+                  width: `${snapshot.selectedPlayers.length ? Math.min(100, (snapshot.completedPlayers.length / snapshot.selectedPlayers.length) * 100) : 0}%`
+                }}
+              />
             </div>
           </div>
 
-          {message ? <p className="rounded-lg bg-white/14 p-3 text-sm font-bold text-white">{isPending ? `${message} Syncing...` : message}</p> : null}
+          {message ? (
+            <p className="rounded-lg bg-white/14 p-3 text-sm font-bold text-white">
+              {isPending ? `${message} Syncing...` : message}
+            </p>
+          ) : null}
         </div>
       </div>
 
       <div className="auction-rules-panel surface">
-        <div className="section-title mb-3"><h2>Bid Rules</h2><Gavel size={20} /></div>
-        <div className="grid gap-2 text-sm font-bold text-[var(--muted)]">
-          <div className="data-row p-3">Only selected captains can bid from their device.</div>
-          <div className="data-row p-3">Current player, bid and status are saved in the database.</div>
-          <div className="data-row p-3">Base price: INR {formatAuctionMoney(AUCTION_BASE_PRICE)}</div>
-          <div className="data-row p-3">Increment: INR 50,000 below INR 5,00,000.</div>
-          <div className="data-row p-3">Increment: INR 1,00,000 after INR 5,00,000.</div>
-          <div className="data-row p-3">Increment: INR 1,50,000 after INR 10,00,000.</div>
-        </div>
-
-        <div className="section-title mb-3 mt-4"><h2>Completed</h2><Trophy size={20} /></div>
-        <div className="grid gap-2 text-sm font-bold text-[var(--muted)]">
-          {snapshot.completedPlayers.slice(0, 10).map((row) => (
-            <div key={row.playerId} className="data-row p-3">
-              <div className="font-black text-[var(--foreground)]">{row.player?.display_name ?? "Player"}</div>
-              <div>{row.status}{row.teamName ? ` - ${row.teamName}` : ""}{row.amount ? ` - INR ${formatAuctionMoney(row.amount)}` : ""}</div>
+        <section>
+          <div className="section-title">
+            <h2>Bidding rules</h2>
+            <Gavel size={16} />
+          </div>
+          <div className="grid text-[var(--muted)]">
+            <div className="data-row flex justify-between gap-2">
+              <span>Base price</span>
+              <span>INR {formatAuctionMoney(AUCTION_BASE_PRICE)}</span>
             </div>
-          ))}
-          {!snapshot.completedPlayers.length ? <div className="empty-state min-h-0">Results appear as players are sold, skipped, or unsold.</div> : null}
-        </div>
+            <div className="data-row flex justify-between gap-2">
+              <span>Below 5 lakh</span>
+              <span>+50,000</span>
+            </div>
+            <div className="data-row flex justify-between gap-2">
+              <span>5 to 10 lakh</span>
+              <span>+1,00,000</span>
+            </div>
+            <div className="data-row flex justify-between gap-2">
+              <span>10 lakh and above</span>
+              <span>+1,50,000</span>
+            </div>
+          </div>
+        </section>
+        <section>
+          <div className="section-title">
+            <h2>Results</h2>
+            <span className="section-count">{snapshot.completedPlayers.length}</span>
+          </div>
+          <div className="auction-results-list grid text-[var(--muted)]">
+            {snapshot.completedPlayers.map((row) => (
+              <div key={row.playerId} className="data-row p-3">
+                <div className="font-black text-[var(--foreground)]">{row.player?.display_name ?? "Player"}</div>
+                <div>
+                  {row.status}
+                  {row.teamName ? ` - ${row.teamName}` : ""}
+                  {row.amount ? ` - INR ${formatAuctionMoney(row.amount)}` : ""}
+                </div>
+              </div>
+            ))}
+            {!snapshot.completedPlayers.length ? (
+              <div className="empty-state min-h-0">No completed bids yet.</div>
+            ) : null}
+          </div>
+        </section>
       </div>
     </section>
   );

@@ -1,6 +1,7 @@
 "use client";
 
-import { optimizedPhotoUrl } from "@/lib/images";
+import { PlayerAvatar } from "@/components/football/PlayerAvatar";
+import { ArrowLeft, ArrowRight, Check, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -27,15 +28,6 @@ type AuctionSetupFormProps = {
   canManage: boolean;
 };
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
 type PlayerTileProps = {
   player: Player;
   selected: boolean;
@@ -46,30 +38,16 @@ type PlayerTileProps = {
 };
 
 const PlayerTile = memo(function PlayerTile({ player, selected, disabled, status, detail, onSelect }: PlayerTileProps) {
-  const photoUrl = optimizedPhotoUrl(player.profile_image);
-
   return (
     <button
       className={`auction-fast-card ${selected ? "auction-fast-card-active" : ""}`}
       disabled={disabled}
+      aria-pressed={selected}
+      title={player.display_name}
       type="button"
       onClick={() => onSelect(player.id)}
     >
-      <span className="auction-fast-avatar" aria-hidden="true">
-        {photoUrl ? (
-          <img
-            alt=""
-            decoding="async"
-            draggable={false}
-            height={44}
-            loading="lazy"
-            src={photoUrl}
-            width={44}
-          />
-        ) : (
-          initials(player.display_name)
-        )}
-      </span>
+      <PlayerAvatar className="auction-fast-avatar" src={player.profile_image} name={player.display_name} />
       <span className="min-w-0">
         <span className="block truncate font-black">{player.display_name}</span>
         <span className="block truncate text-xs font-bold text-[var(--muted)]">{detail}</span>
@@ -79,18 +57,36 @@ const PlayerTile = memo(function PlayerTile({ player, selected, disabled, status
   );
 });
 
-export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, auctioneerId, canManage }: AuctionSetupFormProps) {
+export function AuctionSetupForm({
+  matchId,
+  teams,
+  players,
+  selectedPlayerIds,
+  auctioneerId,
+  canManage
+}: AuctionSetupFormProps) {
   const router = useRouter();
   const setupTeams = useMemo(() => teams.slice(0, 2), [teams]);
   const [message, setMessage] = useState("");
   const [step, setStep] = useState<"captains" | "auctioneer" | "players">("captains");
   const [activeTeamId, setActiveTeamId] = useState(setupTeams[0]?.id ?? "");
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const visiblePlayers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return query
+      ? players.filter((player) =>
+          `${player.display_name} ${player.username} ${player.preferred_position}`.toLowerCase().includes(query)
+        )
+      : players;
+  }, [players, search]);
   const [auctioneer, setAuctioneer] = useState(auctioneerId ?? "");
   const [captains, setCaptains] = useState<Record<string, string>>(() =>
     Object.fromEntries(setupTeams.map((team) => [team.id, team.captain_id ?? ""]))
   );
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(selectedPlayerIds.length ? selectedPlayerIds : players.map((player) => player.id)));
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(selectedPlayerIds.length ? selectedPlayerIds : players.map((player) => player.id))
+  );
   const playerById = useMemo(() => new Map(players.map((player) => [player.id, player])), [players]);
   const captainIds = useMemo(() => new Set(Object.values(captains).filter(Boolean)), [captains]);
   const captainTeamByPlayerId = useMemo(() => {
@@ -102,7 +98,10 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
   const captainCount = captainIds.size;
   const captainsPicked = setupTeams.length >= 2 && captainCount >= 2;
   const auctioneerPicked = Boolean(auctioneer) && !captainIds.has(auctioneer);
-  const roleIds = useMemo(() => new Set([...Array.from(captainIds), auctioneer].filter(Boolean)), [auctioneer, captainIds]);
+  const roleIds = useMemo(
+    () => new Set([...Array.from(captainIds), auctioneer].filter(Boolean)),
+    [auctioneer, captainIds]
+  );
   const auctionPlayerCount = Array.from(selected).filter((playerId) => !roleIds.has(playerId)).length;
   const activeTeam = setupTeams.find((team) => team.id === activeTeamId) ?? setupTeams[0];
 
@@ -123,48 +122,62 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
     setMessage("");
     setSaving(true);
     const payload = setupTeams.map((team) => ({ id: team.id, captainId: captains[team.id] }));
-    const response = await fetch("/api/auctions/setup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        matchId,
-        teams: payload,
-        auctioneerId: auctioneer,
-        playerIds: Array.from(selected).filter((playerId) => !roleIds.has(playerId))
-      })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setMessage(data.error ?? "Could not save auction setup.");
+    try {
+      const response = await fetch("/api/auctions/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          matchId,
+          teams: payload,
+          auctioneerId: auctioneer,
+          playerIds: Array.from(selected).filter((playerId) => !roleIds.has(playerId))
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setMessage(data.error ?? "Could not save auction setup.");
+        setSaving(false);
+        return;
+      }
+      setMessage("Setup saved.");
+      router.refresh();
+    } catch {
+      setMessage("Connection interrupted. Please try again.");
+    } finally {
       setSaving(false);
-      return;
     }
-    setMessage("Setup saved.");
-    router.refresh();
   }
 
-  const chooseCaptain = useCallback((playerId: string) => {
-    if (!activeTeam) return;
-    const next = { ...captains, [activeTeam.id]: playerId };
-    const nextOpenTeam = setupTeams.find((team) => team.id !== activeTeam.id && !next[team.id]);
-    setCaptains(next);
-    if (nextOpenTeam) setActiveTeamId(nextOpenTeam.id);
-  }, [activeTeam, captains, setupTeams]);
+  const chooseCaptain = useCallback(
+    (playerId: string) => {
+      if (!activeTeam) return;
+      const next = { ...captains, [activeTeam.id]: playerId };
+      const nextOpenTeam = setupTeams.find((team) => team.id !== activeTeam.id && !next[team.id]);
+      setCaptains(next);
+      if (nextOpenTeam) setActiveTeamId(nextOpenTeam.id);
+    },
+    [activeTeam, captains, setupTeams]
+  );
 
-  const togglePlayer = useCallback((playerId: string) => {
-    if (roleIds.has(playerId)) return;
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(playerId)) next.delete(playerId);
-      else next.add(playerId);
-      return next;
-    });
-  }, [roleIds]);
+  const togglePlayer = useCallback(
+    (playerId: string) => {
+      if (roleIds.has(playerId)) return;
+      setSelected((current) => {
+        const next = new Set(current);
+        if (next.has(playerId)) next.delete(playerId);
+        else next.add(playerId);
+        return next;
+      });
+    },
+    [roleIds]
+  );
 
   if (!canManage) {
     return (
       <div className="surface p-4">
-        <div className="section-title mb-3"><h2>Auction Setup</h2></div>
+        <div className="section-title mb-3">
+          <h2>Auction Setup</h2>
+        </div>
         <div className="empty-state min-h-0">Setup pending.</div>
       </div>
     );
@@ -183,19 +196,32 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
         <button className="btn-primary w-full sm:w-fit" type="button" onClick={() => router.refresh()}>
           Reload Auction Setup
         </button>
-        <div className="empty-state min-h-0">
-          Reload after team slots appear.
-        </div>
+        <div className="empty-state min-h-0">Reload after team slots appear.</div>
       </div>
     );
   }
 
   return (
     <div className="auction-setup-screen">
+      <ol className="setup-progress" aria-label="Auction setup progress">
+        {(["captains", "auctioneer", "players"] as const).map((stage, index) => (
+          <li
+            key={stage}
+            className="setup-progress-step"
+            data-active={stage === step}
+            aria-current={stage === step ? "step" : undefined}
+          >
+            <span>{["captains", "auctioneer", "players"].indexOf(step) > index ? <Check size={11} /> : index + 1}</span>
+            {stage === "captains" ? "Captains" : stage === "auctioneer" ? "Auctioneer" : "Player pool"}
+          </li>
+        ))}
+      </ol>
       <div className="auction-setup-header">
         <div>
           <p className="eyebrow">Auction setup</p>
-          <h2>{step === "captains" ? "Select Captains" : step === "auctioneer" ? "Select Auctioneer" : "Auction Pool"}</h2>
+          <h2>
+            {step === "captains" ? "Select Captains" : step === "auctioneer" ? "Select Auctioneer" : "Auction Pool"}
+          </h2>
           <p>
             {step === "captains"
               ? "Pick two captains."
@@ -206,11 +232,29 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
         </div>
       </div>
 
+      <label className="relative block max-w-sm">
+        <Search size={15} className="absolute left-3 top-3.5 text-[var(--muted)]" />
+        <input
+          className="field pl-9"
+          type="search"
+          aria-label="Search players"
+          placeholder="Search players or positions"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </label>
+      {!visiblePlayers.length ? <p className="text-sm text-[var(--muted)]">No players found.</p> : null}
+
       {step === "captains" ? (
         <>
           <div className="auction-captain-grid">
             {setupTeams.map((team) => (
-              <button key={team.id} className={`auction-captain-card ${activeTeam?.id === team.id ? "auction-captain-card-active" : ""}`} type="button" onClick={() => setActiveTeamId(team.id)}>
+              <button
+                key={team.id}
+                className={`auction-captain-card ${activeTeam?.id === team.id ? "auction-captain-card-active" : ""}`}
+                type="button"
+                onClick={() => setActiveTeamId(team.id)}
+              >
                 <span>{team.name} Captain</span>
                 <strong>{playerById.get(captains[team.id])?.display_name ?? "Unassigned"}</strong>
               </button>
@@ -218,7 +262,7 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
           </div>
 
           <div className="auction-fast-grid">
-            {players.map((player) => {
+            {visiblePlayers.map((player) => {
               const selectedTeam = captainTeamByPlayerId.get(player.id);
               const unavailable = Boolean(selectedTeam && selectedTeam.id !== activeTeam?.id);
               return (
@@ -228,31 +272,34 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
                   disabled={unavailable}
                   onSelect={chooseCaptain}
                   player={player}
-                  selected={captains[activeTeam?.id ?? ""] === player.id}
+                  selected={Boolean(selectedTeam)}
                   status={selectedTeam ? "SET" : undefined}
                 />
               );
             })}
           </div>
 
-          <button className="btn-primary w-full sm:w-fit" disabled={!captainsPicked} type="button" onClick={() => setStep("auctioneer")}>
-            Next: Auctioneer
+          <button
+            className="btn-primary w-full sm:w-fit"
+            disabled={!captainsPicked}
+            type="button"
+            onClick={() => setStep("auctioneer")}
+          >
+            Choose auctioneer <ArrowRight size={15} />
           </button>
           {!captainsPicked ? (
-            <div className="empty-state min-h-0">
-              Two captains required.
-            </div>
+            <p className="text-xs text-[var(--muted)]">{captainCount} of 2 captains selected</p>
           ) : null}
         </>
       ) : step === "auctioneer" ? (
         <div className="grid gap-3">
           <div>
             <button className="btn-secondary" type="button" onClick={() => setStep("captains")}>
-              Back to Captains
+              <ArrowLeft size={14} /> Captains
             </button>
           </div>
           <div className="auction-fast-grid">
-            {players.map((player) => {
+            {visiblePlayers.map((player) => {
               const captain = captainIds.has(player.id);
               return (
                 <PlayerTile
@@ -267,20 +314,21 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
               );
             })}
           </div>
-          <button className="btn-primary w-full sm:w-fit" disabled={!auctioneerPicked} type="button" onClick={() => setStep("players")}>
-            Next: Pool
+          <button
+            className="btn-primary w-full sm:w-fit"
+            disabled={!auctioneerPicked}
+            type="button"
+            onClick={() => setStep("players")}
+          >
+            Choose players <ArrowRight size={15} />
           </button>
-          {!auctioneerPicked ? (
-            <div className="empty-state min-h-0">
-              Auctioneer required.
-            </div>
-          ) : null}
+          {!auctioneerPicked ? <p className="text-xs text-[var(--muted)]">Auctioneer required.</p> : null}
         </div>
       ) : (
         <div className="grid gap-3">
           <div>
             <button className="btn-secondary" type="button" onClick={() => setStep("auctioneer")}>
-              Back
+              <ArrowLeft size={14} /> Auctioneer
             </button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -288,14 +336,20 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
             <div className="text-sm font-black text-[var(--muted)]">{auctionPlayerCount} selected</div>
           </div>
           <div className="auction-fast-grid">
-            {players.map((player) => {
+            {visiblePlayers.map((player) => {
               const checked = selected.has(player.id);
               const captain = captainIds.has(player.id);
               const auctioneerSelected = auctioneer === player.id;
               return (
                 <PlayerTile
                   key={player.id}
-                  detail={captain ? "Captain" : auctioneerSelected ? "Auctioneer" : `@${player.username} - ${player.preferred_position}`}
+                  detail={
+                    captain
+                      ? "Captain"
+                      : auctioneerSelected
+                        ? "Auctioneer"
+                        : `@${player.username} - ${player.preferred_position}`
+                  }
                   disabled={captain || auctioneerSelected}
                   onSelect={togglePlayer}
                   player={player}
@@ -305,12 +359,19 @@ export function AuctionSetupForm({ matchId, teams, players, selectedPlayerIds, a
               );
             })}
           </div>
-          <button className="btn-primary w-full sm:w-fit" disabled={saving || auctionPlayerCount < 1} type="button" onClick={saveSetup}>
-            {saving ? "Saving..." : "Save Setup"}
+          <button
+            className="btn-primary w-full sm:w-fit"
+            disabled={saving || auctionPlayerCount < 1}
+            type="button"
+            onClick={saveSetup}
+          >
+            {saving ? "Saving..." : "Open auction room"} <ArrowRight size={15} />
           </button>
         </div>
       )}
-      {message ? <p className="rounded-lg bg-[#e8f5ef] p-3 text-sm font-bold text-[var(--accent-dark)]">{message}</p> : null}
+      {message ? (
+        <p className="rounded-lg bg-[#e8f5ef] p-3 text-sm font-bold text-[var(--accent-dark)]">{message}</p>
+      ) : null}
     </div>
   );
 }

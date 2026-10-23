@@ -3,7 +3,8 @@ import { getCurrentAppUser } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { redirect } from "next/navigation";
 
-export default async function MatchPage() {
+export default async function MatchPage({ searchParams }: { searchParams: Promise<{ create?: string }> }) {
+  const { create } = await searchParams;
   const user = await getCurrentAppUser();
   if (!user) redirect("/");
 
@@ -23,7 +24,9 @@ export default async function MatchPage() {
   const { data: matches } = groupIds.length
     ? await supabase
         .from("matches")
-        .select("id, group_id, scheduled_date, match_time, location, maximum_players, status, groups(name), match_availability(status), teams(id, name), match_events(id, event_type, team_id)")
+        .select(
+          "id, group_id, scheduled_date, match_time, location, maximum_players, status, groups(name), match_availability(status), teams(id, name), match_events(id, event_type, team_id)"
+        )
         .in("group_id", groupIds)
         .in("status", ["SCHEDULED", "LIVE", "ENDED"])
         .order("scheduled_date", { ascending: true })
@@ -35,11 +38,15 @@ export default async function MatchPage() {
         <div>
           <p className="eyebrow">Matchday</p>
           <h1 className="text-4xl font-black">My Matches</h1>
-          <p className="text-sm font-medium text-white/62">Upcoming, live, and completed games for your football groups.</p>
+          <p className="text-sm font-medium text-white/62">{(matches ?? []).length} matches</p>
         </div>
       </header>
 
-      <MyMatches groups={visibleMemberships as any} matches={(matches ?? []) as any} />
+      <MyMatches
+        groups={visibleMemberships as any}
+        matches={(matches ?? []) as any}
+        initialScheduleOpen={create === "1"}
+      />
     </div>
   );
 }

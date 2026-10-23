@@ -3,7 +3,7 @@
 import { CalendarClock, Clock, MapPin, Play, Plus, Radio, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type GroupOption = {
   role: string;
@@ -27,17 +27,39 @@ type MatchItem = {
   match_events?: Array<{ id: string; event_type: string; team_id: string | null }>;
 };
 
-export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches: MatchItem[] }) {
+export function MyMatches({
+  groups,
+  matches,
+  initialScheduleOpen = false
+}: {
+  groups: GroupOption[];
+  matches: MatchItem[];
+  initialScheduleOpen?: boolean;
+}) {
   const router = useRouter();
   const [localMatches, setLocalMatches] = useState(matches);
-  const [selectedId, setSelectedId] = useState(matches.find((match) => match.status === "LIVE")?.id ?? matches[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(
+    matches.find((match) => match.status === "LIVE")?.id ?? matches[0]?.id ?? ""
+  );
   const [message, setMessage] = useState("");
-  const [scheduleOpen, setScheduleOpen] = useState(!matches.length);
+  const [scheduleOpen, setScheduleOpen] = useState(initialScheduleOpen || !matches.length);
+  useEffect(() => {
+    if (initialScheduleOpen) setScheduleOpen(true);
+  }, [initialScheduleOpen]);
   const [pendingRsvp, setPendingRsvp] = useState("");
-  const selected = localMatches.find((match) => match.id === selectedId) ?? localMatches[0];
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const visibleMatches = useMemo(
+    () => (statusFilter === "ALL" ? localMatches : localMatches.filter((match) => match.status === statusFilter)),
+    [localMatches, statusFilter]
+  );
+  const selected = visibleMatches.find((match) => match.id === selectedId) ?? visibleMatches[0];
   const selectedIsAuction = selected?.status === "AUCTION";
   const selectedHref = selectedIsAuction ? `/auction?matchId=${selected.id}` : selected ? `/match/${selected.id}` : "#";
-  const selectedActionLabel = selectedIsAuction ? "Join back auction" : selected?.status === "LIVE" ? "Live now" : "Open match room";
+  const selectedActionLabel = selectedIsAuction
+    ? "Join back auction"
+    : selected?.status === "LIVE"
+      ? "Live now"
+      : "Open match room";
 
   const selectedScore = useMemo(() => {
     const teamA = selected?.teams?.[0];
@@ -111,7 +133,31 @@ export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches:
             Schedule Match
           </button>
         </div>
-        {message ? <p className="rounded-lg bg-white px-3 py-2 text-sm font-bold text-[var(--muted)]">{message}</p> : null}
+        {message ? (
+          <p className="rounded-lg bg-white px-3 py-2 text-sm font-bold text-[var(--muted)]">{message}</p>
+        ) : null}
+      </div>
+
+      <div className="segmented-control" role="tablist" aria-label="Match status">
+        {[
+          ["ALL", "All matches"],
+          ["LIVE", "Live"],
+          ["SCHEDULED", "Upcoming"],
+          ["ENDED", "Results"]
+        ].map(([status, label]) => (
+          <button
+            key={status}
+            role="tab"
+            aria-selected={statusFilter === status}
+            type="button"
+            onClick={() => setStatusFilter(status)}
+          >
+            {label}
+            <span>
+              {status === "ALL" ? localMatches.length : localMatches.filter((match) => match.status === status).length}
+            </span>
+          </button>
+        ))}
       </div>
 
       {scheduleOpen ? (
@@ -122,9 +168,13 @@ export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches:
           </div>
           <div className="grid gap-3 lg:grid-cols-[1.2fr_0.85fr_0.85fr]">
             <select className="field" name="groupId" required defaultValue={groups[0]?.groups.id ?? ""}>
-              <option value="" disabled>Select group</option>
+              <option value="" disabled>
+                Select group
+              </option>
               {groups.map((group) => (
-                <option key={group.groups.id} value={group.groups.id}>{group.groups.name}</option>
+                <option key={group.groups.id} value={group.groups.id}>
+                  {group.groups.name}
+                </option>
               ))}
             </select>
             <input className="field" name="scheduledDate" type="date" />
@@ -132,7 +182,14 @@ export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches:
           </div>
           <div className="grid gap-3 lg:grid-cols-[1fr_160px]">
             <input className="field" name="location" placeholder="Ground / location" />
-            <input className="field" name="maximumPlayers" min="2" placeholder="Players" type="number" defaultValue={12} />
+            <input
+              className="field"
+              name="maximumPlayers"
+              min="2"
+              placeholder="Players"
+              type="number"
+              defaultValue={12}
+            />
           </div>
           <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-4">
@@ -141,7 +198,9 @@ export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches:
                 Without auction
               </label>
             </div>
-            <button className="btn-primary min-w-40" disabled={!groups.length} type="submit"><Plus size={18} /> Create</button>
+            <button className="btn-primary min-w-40" disabled={!groups.length} type="submit">
+              <Plus size={18} /> Create
+            </button>
           </div>
         </form>
       ) : null}
@@ -153,7 +212,7 @@ export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches:
             <Trophy size={20} />
           </div>
           <div className="match-list-scroll">
-            {localMatches.map((match) => {
+            {visibleMatches.map((match) => {
               const playing = (match.match_availability ?? []).filter((item) => item.status === "PLAYING").length;
               const active = selected?.id === match.id;
               return (
@@ -165,19 +224,27 @@ export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches:
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-black">{match.groups?.name ?? "Football group"}</span>
-                    <span className={`rounded-lg px-2 py-1 text-xs font-black ${match.status === "LIVE" ? "bg-red-600 text-white" : "bg-[#e8f5ef] text-[var(--accent-dark)]"}`}>
+                    <span
+                      className={`rounded-lg px-2 py-1 text-xs font-black ${match.status === "LIVE" ? "bg-red-600 text-white" : "bg-[#e8f5ef] text-[var(--accent-dark)]"}`}
+                    >
                       {match.status === "LIVE" ? "LIVE" : match.status}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs font-bold text-[var(--muted)]">
-                    <span className="flex items-center gap-1"><CalendarClock size={14} /> {match.scheduled_date}</span>
-                    <span className="flex items-center gap-1"><Clock size={14} /> {match.match_time}</span>
-                    <span className="flex items-center gap-1"><Users size={14} /> {playing}/{match.maximum_players}</span>
+                    <span className="flex items-center gap-1">
+                      <CalendarClock size={14} /> {match.scheduled_date}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock size={14} /> {match.match_time}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users size={14} /> {playing}/{match.maximum_players}
+                    </span>
                   </div>
                 </button>
               );
             })}
-            {!localMatches.length ? (
+            {!visibleMatches.length ? (
               <div className="empty-state min-h-0">
                 <div>
                   <Trophy className="mx-auto mb-2 text-[var(--accent-dark)]" size={24} />
@@ -189,59 +256,95 @@ export function MyMatches({ groups, matches }: { groups: GroupOption[]; matches:
         </div>
 
         <div className="match-preview-panel surface overflow-hidden">
-        <div className="scoreboard p-4 sm:p-5">
-          <div className="mb-5 flex items-center justify-between text-xs font-black uppercase tracking-wide text-white/52">
-            <span>{selected ? selected.groups?.name ?? "Match" : "Waiting for match"}</span>
-            <span className="flex items-center gap-1">{selected?.status === "LIVE" ? <Radio size={14} /> : null}{selected?.status ?? "Idle"}</span>
-          </div>
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
-            <div>
-              <div className="truncate text-sm font-black text-white/64">{selectedScore.teamA?.name ?? "Team A"}</div>
-              <div className="mt-3 text-6xl font-black sm:text-7xl">{selectedScore.teamAGoals}</div>
-            </div>
-            <div className="rounded-lg bg-white/10 px-3 py-2 text-sm font-black text-[var(--amber)]">VS</div>
-            <div>
-              <div className="truncate text-sm font-black text-white/64">{selectedScore.teamB?.name ?? "Team B"}</div>
-              <div className="mt-3 text-6xl font-black sm:text-7xl">{selectedScore.teamBGoals}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-3 p-3 sm:p-4">
           {selected ? (
-            <>
-              <div className="grid gap-2 text-sm font-bold text-[var(--muted)] sm:grid-cols-3">
-                <span className="flex items-center gap-2"><CalendarClock size={17} /> {selected.scheduled_date}</span>
-                <span className="flex items-center gap-2"><Clock size={17} /> {selected.match_time}</span>
-                <span className="flex items-center gap-2"><MapPin size={17} /> {selected.location}</span>
+            <div className="scoreboard p-4 sm:p-5">
+              <div className="mb-5 flex items-center justify-between text-xs font-black uppercase tracking-wide text-white/52">
+                <span>{selected ? (selected.groups?.name ?? "Match") : "Waiting for match"}</span>
+                <span className="flex items-center gap-1">
+                  {selected?.status === "LIVE" ? <Radio size={14} /> : null}
+                  {selected?.status ?? "Idle"}
+                </span>
               </div>
-              {selectedIsAuction ? (
-                <div className="data-row p-3 text-sm font-bold text-[var(--muted)]">
-                  Auction active. Finish it before match room opens.
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
+                <div>
+                  <div className="truncate text-sm font-black text-white/64">
+                    {selectedScore.teamA?.name ?? "Team A"}
+                  </div>
+                  <div className="mt-3 text-6xl font-black sm:text-7xl">{selectedScore.teamAGoals}</div>
                 </div>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <button className="btn-primary" disabled={Boolean(pendingRsvp)} type="button" onClick={() => rsvp(selected.id, "PLAYING")}>{pendingRsvp === "PLAYING" ? "Saving..." : "Playing"}</button>
-                  <button className="btn-secondary" disabled={Boolean(pendingRsvp)} type="button" onClick={() => rsvp(selected.id, "MAYBE")}>{pendingRsvp === "MAYBE" ? "Saving..." : "Maybe"}</button>
-                  <button className="btn-secondary" disabled={Boolean(pendingRsvp)} type="button" onClick={() => rsvp(selected.id, "NOT_PLAYING")}>{pendingRsvp === "NOT_PLAYING" ? "Saving..." : "Out"}</button>
+                <div className="rounded-lg bg-white/10 px-3 py-2 text-sm font-black text-[var(--amber)]">VS</div>
+                <div>
+                  <div className="truncate text-sm font-black text-white/64">
+                    {selectedScore.teamB?.name ?? "Team B"}
+                  </div>
+                  <div className="mt-3 text-6xl font-black sm:text-7xl">{selectedScore.teamBGoals}</div>
                 </div>
-              )}
-              <Link className="btn-dark w-full" href={selectedHref}>
-                <Play size={18} />
-                {selectedActionLabel}
-              </Link>
-            </>
-          ) : (
-            <div className="empty-state">
-              <div>
-                <Trophy className="mx-auto mb-3 text-[var(--accent-dark)]" size={28} />
-                <p className="font-black text-[var(--foreground)]">No match selected</p>
-                <p className="mt-1 text-sm">Schedule a match to open the room.</p>
               </div>
             </div>
-          )}
+          ) : null}
+
+          <div className="grid gap-3 p-3 sm:p-4">
+            {selected ? (
+              <>
+                <div className="grid gap-2 text-sm font-bold text-[var(--muted)] sm:grid-cols-3">
+                  <span className="flex items-center gap-2">
+                    <CalendarClock size={17} /> {selected.scheduled_date}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Clock size={17} /> {selected.match_time}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <MapPin size={17} /> {selected.location}
+                  </span>
+                </div>
+                {selectedIsAuction ? (
+                  <div className="data-row p-3 text-sm font-bold text-[var(--muted)]">
+                    Auction active. Finish it before match room opens.
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <button
+                      className="btn-primary"
+                      disabled={Boolean(pendingRsvp)}
+                      type="button"
+                      onClick={() => rsvp(selected.id, "PLAYING")}
+                    >
+                      {pendingRsvp === "PLAYING" ? "Saving..." : "Playing"}
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      disabled={Boolean(pendingRsvp)}
+                      type="button"
+                      onClick={() => rsvp(selected.id, "MAYBE")}
+                    >
+                      {pendingRsvp === "MAYBE" ? "Saving..." : "Maybe"}
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      disabled={Boolean(pendingRsvp)}
+                      type="button"
+                      onClick={() => rsvp(selected.id, "NOT_PLAYING")}
+                    >
+                      {pendingRsvp === "NOT_PLAYING" ? "Saving..." : "Out"}
+                    </button>
+                  </div>
+                )}
+                <Link className="btn-dark w-full" href={selectedHref}>
+                  <Play size={18} />
+                  {selectedActionLabel}
+                </Link>
+              </>
+            ) : (
+              <div className="empty-state">
+                <div>
+                  <Trophy className="mx-auto mb-3 text-[var(--accent-dark)]" size={28} />
+                  <p className="font-black text-[var(--foreground)]">No match selected</p>
+                  <p className="mt-1 text-sm">Schedule a match to open the room.</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
       </div>
     </section>
   );

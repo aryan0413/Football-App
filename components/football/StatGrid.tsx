@@ -15,7 +15,7 @@ export function StatGrid({ stats }: { stats: UserStats }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 2xl:grid-cols-8">
+    <div className="stat-grid">
       {values.map(([label, value, Icon]) => (
         <div key={label} className="stat-card">
           <div className="flex items-center justify-between gap-3">

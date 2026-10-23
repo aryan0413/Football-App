@@ -4,23 +4,7 @@ import { Check, ImagePlus, Shirt, Sparkles, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-const positionOptions = [
-  "GK",
-  "LB",
-  "CB",
-  "RB",
-  "LWB",
-  "RWB",
-  "CDM",
-  "CM",
-  "CAM",
-  "LM",
-  "RM",
-  "LW",
-  "RW",
-  "CF",
-  "ST"
-];
+const positionOptions = ["GK", "LB", "CB", "RB", "LWB", "RWB", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW", "CF", "ST"];
 
 export function OnboardingForm() {
   const router = useRouter();
@@ -96,7 +80,9 @@ export function OnboardingForm() {
       <section className="profile-preview">
         <div className="player-card-preview">
           <div className="mb-8 flex items-center justify-between gap-3">
-            <span className="position-chip"><Sparkles size={14} /> Matchday profile</span>
+            <span className="position-chip">
+              <Sparkles size={14} /> Matchday profile
+            </span>
             <span className="position-chip">FC</span>
           </div>
           <div className="avatar-ring">
@@ -112,7 +98,9 @@ export function OnboardingForm() {
               {displayName || "Your Name"}
             </h1>
             <div className="mt-4 flex flex-wrap gap-2">
-              <span className="position-chip"><Shirt size={14} /> {primaryPosition}</span>
+              <span className="position-chip">
+                <Shirt size={14} /> {primaryPosition}
+              </span>
               <span className="position-chip">{secondaryPosition || "Flexible"}</span>
             </div>
           </div>
@@ -122,7 +110,7 @@ export function OnboardingForm() {
       <section className="grid content-center gap-5 p-5 sm:p-7">
         <div>
           <p className="eyebrow">Create profile</p>
-          <h2 className="mt-1 text-3xl font-black leading-tight sm:text-4xl">Step onto the pitch</h2>
+          <h2 className="mt-1 text-3xl font-black leading-tight sm:text-4xl">Your player profile</h2>
           <p className="mt-2 text-sm font-medium text-[var(--muted)]">Name, position, photo.</p>
         </div>
 
@@ -150,7 +138,9 @@ export function OnboardingForm() {
                 value={primaryPosition}
                 onChange={(event) => setPrimaryPosition(event.target.value)}
               >
-                {positionOptions.map((position) => <option key={position}>{position}</option>)}
+                {positionOptions.map((position) => (
+                  <option key={position}>{position}</option>
+                ))}
               </select>
             </label>
             <label className="grid gap-2 text-sm font-black">
@@ -162,7 +152,9 @@ export function OnboardingForm() {
                 onChange={(event) => setSecondaryPosition(event.target.value)}
               >
                 <option value="">None</option>
-                {positionOptions.map((position) => <option key={position}>{position}</option>)}
+                {positionOptions.map((position) => (
+                  <option key={position}>{position}</option>
+                ))}
               </select>
             </label>
           </div>
@@ -172,7 +164,9 @@ export function OnboardingForm() {
             <span className="grid gap-3 rounded-lg border border-dashed border-[rgba(7,21,35,0.18)] bg-[var(--panel-soft)] p-3 sm:grid-cols-[1fr_auto] sm:items-center">
               <span>
                 <span className="block font-black">Upload or attach image</span>
-                <span className="mt-1 block text-sm font-medium text-[var(--muted)]">Clear face or football photo, under 1.5 MB.</span>
+                <span className="mt-1 block text-sm font-medium text-[var(--muted)]">
+                  JPG, PNG or WebP. Up to 6 MB.
+                </span>
               </span>
               <span className="btn-secondary cursor-pointer">
                 <ImagePlus size={18} />

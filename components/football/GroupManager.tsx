@@ -2,7 +2,7 @@
 
 import { Gavel, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GroupCard } from "@/components/football/cards/GroupCard";
 
 type Membership = {
@@ -12,6 +12,7 @@ type Membership = {
     name: string;
     logo: string | null;
     description: string | null;
+    member_count?: number;
   };
 };
 
@@ -21,6 +22,7 @@ export function GroupManager({ memberships }: { memberships: Membership[] }) {
   const [message, setMessage] = useState("");
   const [createOpen, setCreateOpen] = useState(!memberships.length);
   const [joinOpen, setJoinOpen] = useState(false);
+  useEffect(() => setItems(memberships), [memberships]);
 
   async function createGroup(formData: FormData) {
     setMessage("");
@@ -34,8 +36,9 @@ export function GroupManager({ memberships }: { memberships: Membership[] }) {
       setMessage(data.error ?? "Could not create group.");
       return;
     }
-    setItems((current) => [{ role: "OWNER", groups: data.group }, ...current]);
-    setMessage("Group created. You can now invite players.");
+    setItems((current) => [{ role: "OWNER", groups: { ...data.group, member_count: 1 } }, ...current]);
+    setCreateOpen(false);
+    setMessage("Group created.");
   }
 
   async function joinGroup(formData: FormData) {
@@ -86,30 +89,36 @@ export function GroupManager({ memberships }: { memberships: Membership[] }) {
             Join Group
           </button>
         </div>
-        {message ? <p className="rounded-lg bg-white px-3 py-2 text-sm font-bold text-[var(--muted)]">{message}</p> : null}
+        {message ? (
+          <p className="rounded-lg bg-white px-3 py-2 text-sm font-bold text-[var(--muted)]">{message}</p>
+        ) : null}
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
         {createOpen ? (
           <form action={createGroup} className="group-form-panel pitch-card grid gap-3 p-4">
-          <div className="relative z-10">
-            <p className="text-xs font-black uppercase tracking-wide text-white/62">New group</p>
-            <h2 className="mt-1 text-2xl font-black text-white">Create Football Group</h2>
-          </div>
-          <input className="field" placeholder="Sunday Football Bengaluru" name="name" required />
-          <textarea className="field min-h-28" placeholder="Description" name="description" />
-          <button className="btn-primary w-full" type="submit"><ShieldCheck size={18} /> Create and add players</button>
+            <div className="relative z-10">
+              <p className="text-xs font-black uppercase tracking-wide text-white/62">New group</p>
+              <h2 className="mt-1 text-2xl font-black text-white">Create Football Group</h2>
+            </div>
+            <input className="field" placeholder="Sunday Football Bengaluru" name="name" required />
+            <textarea className="field min-h-28" placeholder="Description" name="description" />
+            <button className="btn-primary w-full" type="submit">
+              <ShieldCheck size={18} /> Create and add players
+            </button>
           </form>
         ) : null}
 
         {joinOpen ? (
           <form action={joinGroup} className="group-form-panel surface grid gap-3 p-4">
-          <div>
-            <p className="eyebrow">Join group</p>
-            <h2 className="text-xl font-black">Enter Group Name</h2>
-          </div>
-          <input className="field" name="groupName" placeholder="Exact group name" required />
-          <button className="btn-dark w-full" type="submit"><UserPlus size={18} /> Join Group</button>
+            <div>
+              <p className="eyebrow">Join group</p>
+              <h2 className="text-xl font-black">Enter Group Name</h2>
+            </div>
+            <input className="field" name="groupName" placeholder="Exact group name" required />
+            <button className="btn-dark w-full" type="submit">
+              <UserPlus size={18} /> Join Group
+            </button>
           </form>
         ) : null}
       </div>
@@ -117,8 +126,12 @@ export function GroupManager({ memberships }: { memberships: Membership[] }) {
       <div className="group-card-grid">
         {items.map((membership) => (
           <div key={membership.groups.id} className="group-card-stack grid gap-3">
-            <GroupCard group={membership.groups} role={membership.role} />
-            <button className="group-auction-control btn-dark w-full" type="button" onClick={() => startAuction(membership.groups.id)}>
+            <GroupCard group={membership.groups} role={membership.role} memberCount={membership.groups.member_count} />
+            <button
+              className="group-auction-control btn-dark w-full"
+              type="button"
+              onClick={() => startAuction(membership.groups.id)}
+            >
               <Gavel size={18} />
               Start Auction Now
             </button>

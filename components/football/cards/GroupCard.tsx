@@ -1,5 +1,5 @@
 import { fallbackPhoto, optimizedPhotoUrl } from "@/lib/images";
-import { CalendarClock, ChevronRight, ShieldCheck, Trophy, Users } from "lucide-react";
+import { CalendarClock, ChevronRight, LockKeyhole, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 
 type GroupCardProps = {
@@ -19,14 +19,20 @@ type GroupCardProps = {
   } | null;
 };
 
-export function GroupCard({ group, role, memberCount = 0, nextMatch }: GroupCardProps) {
+export function GroupCard({ group, role, memberCount, nextMatch }: GroupCardProps) {
   return (
     <article className="group-card surface overflow-hidden transition">
       <div className="group-card-lightbar" />
       <div className="group-card-body grid gap-3 p-3 sm:p-4">
         <div className="group-card-header">
           <div className="group-crest-shell">
-            <img src={optimizedPhotoUrl(group.logo, 132) ?? fallbackPhoto()} alt="" loading="lazy" decoding="async" className="group-crest-image" />
+            <img
+              src={optimizedPhotoUrl(group.logo, 132) ?? fallbackPhoto()}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="group-crest-image"
+            />
           </div>
           <div className="min-w-0">
             <p className="eyebrow">Private club</p>
@@ -40,23 +46,27 @@ export function GroupCard({ group, role, memberCount = 0, nextMatch }: GroupCard
           <div className="club-metric">
             <Users className="text-[var(--accent-dark)]" size={18} />
             <div className="mt-2 text-xs font-bold text-[var(--muted)]">Players</div>
-            <div className="font-black">{memberCount}</div>
+            <div className="font-black">{memberCount ?? "--"}</div>
           </div>
+          {nextMatch ? (
+            <div className="club-metric">
+              <CalendarClock className="text-[var(--accent-dark)]" size={18} />
+              <div className="mt-2 text-xs font-bold text-[var(--muted)]">Next Match</div>
+              <div className="truncate font-black">{nextMatch ? nextMatch.scheduled_date : "-"}</div>
+            </div>
+          ) : null}
           <div className="club-metric">
-            <CalendarClock className="text-[var(--accent-dark)]" size={18} />
-            <div className="mt-2 text-xs font-bold text-[var(--muted)]">Next Match</div>
-            <div className="truncate font-black">{nextMatch ? nextMatch.scheduled_date : "-"}</div>
-          </div>
-          <div className="club-metric">
-            <Trophy className="text-[var(--accent-dark)]" size={18} />
-            <div className="mt-2 text-xs font-bold text-[var(--muted)]">Leaders</div>
-            <div className="font-black">After matches</div>
+            <LockKeyhole className="text-[var(--accent-dark)]" size={18} />
+            <div className="mt-2 text-xs font-bold text-[var(--muted)]">Access</div>
+            <div className="font-black">Private</div>
           </div>
         </div>
 
         {nextMatch ? (
           <div className="fixture-ribbon text-sm">
-            <div className="font-black">{nextMatch.match_time} - {nextMatch.location}</div>
+            <div className="font-black">
+              {nextMatch.match_time} - {nextMatch.location}
+            </div>
             <div className="text-[var(--muted)]">{nextMatch.status}</div>
           </div>
         ) : null}

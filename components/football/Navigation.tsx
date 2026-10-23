@@ -1,65 +1,105 @@
 "use client";
 
-import { BarChart3, Gavel, Home, Shield, Trophy, UserRound } from "lucide-react";
+import {
+  ArrowUpRight,
+  BarChart3,
+  ChevronRight,
+  Gavel,
+  LayoutDashboard,
+  Plus,
+  Shield,
+  Trophy,
+  UserRound
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AuthActions } from "@/components/football/AuthActions";
 
 const items = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/groups", label: "Group", icon: Shield },
-  { href: "/match", label: "Match", icon: Trophy },
-  { href: "/auction", label: "Auction", icon: Gavel },
-  { href: "/stats", label: "Stats", icon: BarChart3 },
-  { href: "/profile", label: "Profile", icon: UserRound }
+  { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/match", label: "My Matches", mobile: "Matches", icon: Trophy },
+  { href: "/auction", label: "Auctions", icon: Gavel },
+  { href: "/groups", label: "My Groups", mobile: "Groups", icon: Shield },
+  { href: "/stats", label: "Performance", mobile: "Stats", icon: BarChart3 },
+  { href: "/profile", label: "Player Profile", mobile: "Profile", icon: UserRound }
 ];
 
 export function Navigation() {
   const pathname = usePathname();
+  const isActive = (href: string) => (href === "/" ? pathname === href : pathname.startsWith(href));
+  const current = items.find((item) => isActive(item.href));
 
   return (
     <>
-      <aside className="app-nav-panel fixed left-0 top-0 z-30 hidden h-screen w-[248px] px-4 py-5 text-white lg:block">
-        <Link href="/" className="nav-brand mb-6 flex items-center gap-3 rounded-lg p-1">
-          <span className="brand-mark">FC</span>
-          <span className="min-w-0">
-            <span className="block text-lg font-black leading-tight">Football Groups</span>
-            <span className="text-sm font-bold text-white/54">Matchday command center</span>
+      <a
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:bg-[var(--accent)] focus:p-3 focus:text-black"
+        href="#main-content"
+      >
+        Skip to content
+      </a>
+      <aside className="app-nav-panel">
+        <Link href="/" className="nav-brand" aria-label="Football Groups home">
+          <span className="brand-mark">
+            <Shield size={23} strokeWidth={2.2} />
+          </span>
+          <span>
+            <span className="brand-name">Football</span>
+            <span className="brand-subtitle">GROUPS</span>
           </span>
         </Link>
-        <nav className="grid gap-1.5">
-          {items.map((item) => {
-            const Icon = item.icon;
-            const active = item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`nav-link ${active ? "nav-link-active" : ""}`}
-              >
-                <Icon size={20} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </aside>
-      <nav className="mobile-nav fixed bottom-0 left-0 right-0 z-40 grid grid-cols-6 px-1 pb-2 pt-1.5 text-white lg:hidden">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
-          return (
+        <p className="nav-caption">Workspace</p>
+        <nav aria-label="Main navigation">
+          {items.map(({ href, label, icon: Icon }) => (
             <Link
-              key={item.href}
-              href={item.href}
-              className={`grid min-h-12 place-items-center rounded-lg text-[10px] font-black ${
-                active ? "bg-white text-[var(--navy)] shadow-lg" : "text-white/60"
-              }`}
+              key={href}
+              href={href}
+              aria-current={isActive(href) ? "page" : undefined}
+              className={`nav-link ${isActive(href) ? "nav-link-active" : ""}`}
             >
-              <Icon size={22} />
-              {item.label}
+              <Icon size={18} />
+              <span>{label}</span>
+              {isActive(href) ? <span className="nav-active-dot" /> : null}
             </Link>
-          );
-        })}
+          ))}
+        </nav>
+        <div className="nav-footer">
+          <Link href="/profile">
+            <span className="nav-footer-icon">
+              <UserRound size={16} />
+            </span>
+            <span>My account</span>
+            <ArrowUpRight size={14} className="ml-auto" />
+          </Link>
+        </div>
+      </aside>
+      <div className="workspace-bar">
+        <div className="workspace-breadcrumb">
+          <Shield size={14} />
+          <span>Workspace</span>
+          <ChevronRight size={12} />
+          <strong>{current?.label ?? "Football Groups"}</strong>
+        </div>
+        <Link className="mobile-brand" href="/">
+          <Shield size={20} />
+          <span>
+            Football<span className="hidden sm:inline"> Groups</span>
+          </span>
+        </Link>
+        <div className="workspace-actions">
+          <Link className="btn-secondary" href="/match?create=1" title="Create a match">
+            <Plus size={15} />
+            <span>New match</span>
+          </Link>
+          <AuthActions />
+        </div>
+      </div>
+      <nav className="mobile-nav" aria-label="Mobile navigation">
+        {items.map(({ href, label, mobile, icon: Icon }) => (
+          <Link key={href} href={href} className="mobile-nav-link" aria-current={isActive(href) ? "page" : undefined}>
+            <Icon size={19} />
+            <span>{mobile ?? label}</span>
+          </Link>
+        ))}
       </nav>
     </>
   );

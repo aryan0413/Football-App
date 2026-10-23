@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Private football groups, auctions, live matches, ratings, and stats.",
     start_url: "/",
     display: "standalone",
-    background_color: "#f7f8f5",
-    theme_color: "#0f8f5f",
+    background_color: "#101112",
+    theme_color: "#101112",
     icons: [
       {
         src: "/icons/icon-192.svg",

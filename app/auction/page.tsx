@@ -46,8 +46,8 @@ export default async function AuctionPage({ searchParams }: { searchParams: Prom
       <div className="page-wrap">
         <header className="py-3 text-white">
           <p className="eyebrow">Auction</p>
-          <h1 className="text-4xl font-black">Auction Hub</h1>
-          <p className="text-sm font-medium text-white/62">Start an auction from your group players first, then schedule the match after.</p>
+          <h1 className="text-4xl font-black">Auctions</h1>
+          <p className="text-sm font-medium text-white/62">{visibleMemberships.length} groups available</p>
         </header>
         <AuctionHub groups={visibleMemberships as any} playersByGroup={playersByGroup} />
       </div>
@@ -67,14 +67,22 @@ export default async function AuctionPage({ searchParams }: { searchParams: Prom
           <div>
             <Gavel className="mx-auto mb-3 text-[var(--accent-dark)]" size={30} />
             <p className="font-black text-[var(--foreground)]">No auction selected</p>
-            <Link className="btn-dark mt-4" href="/groups"><ArrowLeft size={18} /> Back to groups</Link>
+            <Link className="btn-dark mt-4" href="/groups">
+              <ArrowLeft size={18} /> Back to groups
+            </Link>
           </div>
         </div>
       </div>
     );
   }
 
-  const [{ data: membership }, { data: auction }, { data: groupPlayers }, { data: confirmedPlayers }, { data: basicTeams }] = await Promise.all([
+  const [
+    { data: membership },
+    { data: auction },
+    { data: groupPlayers },
+    { data: confirmedPlayers },
+    { data: basicTeams }
+  ] = await Promise.all([
     supabase.from("group_members").select("role").eq("group_id", match.group_id).eq("user_id", user.id).maybeSingle(),
     supabase.from("auctions").select("*").eq("match_id", match.id).maybeSingle(),
     supabase
@@ -86,11 +94,7 @@ export default async function AuctionPage({ searchParams }: { searchParams: Prom
       .select("users(id, display_name, username, preferred_position, profile_image)")
       .eq("match_id", match.id)
       .eq("status", "PLAYING"),
-    supabase
-      .from("teams")
-      .select("id, name, captain_id")
-      .eq("match_id", match.id)
-      .order("name")
+    supabase.from("teams").select("id, name, captain_id").eq("match_id", match.id).order("name")
   ]);
 
   if (!membership) redirect("/auction");
@@ -117,16 +121,21 @@ export default async function AuctionPage({ searchParams }: { searchParams: Prom
   const selectedPlayerIds = (confirmedPlayers ?? []).map((row: any) => row.users?.id).filter(Boolean);
   const captainIds = setupTeams.map((team: any) => team.captain_id).filter(Boolean);
   const setupState = parseAuctionState((match as any).notes, auction?.status === "LIVE" ? "LIVE" : "DRAFT");
-  const setupComplete = new Set(captainIds).size >= 2 && Boolean(setupState.auctioneerId) && selectedPlayerIds.length >= 1;
+  const setupComplete =
+    new Set(captainIds).size >= 2 && Boolean(setupState.auctioneerId) && selectedPlayerIds.length >= 1;
 
   const header = (
     <header className="flex flex-wrap items-end justify-between gap-3 py-3 text-white">
       <div>
         <p className="eyebrow">Auction Room</p>
         <h1 className="text-4xl font-black">{(match as any).groups?.name ?? "Football"} Auction</h1>
-        <p className="text-sm font-medium text-white/62">{match.scheduled_date} at {match.match_time} - {match.location}</p>
+        <p className="text-sm font-medium text-white/62">
+          {match.scheduled_date} at {match.match_time} - {match.location}
+        </p>
       </div>
-      <Link className="btn-secondary" href="/groups"><ArrowLeft size={18} /> Groups</Link>
+      <Link className="btn-secondary" href="/groups">
+        <ArrowLeft size={18} /> Groups
+      </Link>
     </header>
   );
 
@@ -151,16 +160,14 @@ export default async function AuctionPage({ searchParams }: { searchParams: Prom
   return (
     <div className="page-wrap">
       {header}
-      <AuctionRoom
-        matchId={match.id}
-        initialSnapshot={snapshot as any}
-        currentUserId={user.id}
-        canManage={canManage}
-      />
+      <AuctionRoom matchId={match.id} initialSnapshot={snapshot as any} currentUserId={user.id} canManage={canManage} />
 
       {match.status === "AUCTION" && snapshot.state.status === "ENDED" ? (
         <section className="mt-4">
-          <ScheduleAuctionMatchForm matchId={match.id} defaultPlayers={snapshot.selectedPlayers.length || match.maximum_players} />
+          <ScheduleAuctionMatchForm
+            matchId={match.id}
+            defaultPlayers={snapshot.selectedPlayers.length || match.maximum_players}
+          />
         </section>
       ) : null}
     </div>

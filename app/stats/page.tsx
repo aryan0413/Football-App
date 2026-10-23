@@ -19,14 +19,17 @@ export default async function StatsPage() {
     <div className="page-wrap">
       <header className="py-3 text-white">
         <p className="eyebrow">Performance</p>
-        <h1 className="text-4xl font-black">Stats</h1>
-        <p className="text-sm font-medium text-white/62">Overall career numbers and group-specific performance.</p>
+        <h1 className="text-4xl font-black">My performance</h1>
+        <p className="text-sm font-medium text-white/62">{stats.matches} matches played</p>
       </header>
       <StatGrid stats={stats} />
       <section className="mt-4 grid gap-2.5">
         <h2 className="text-lg font-black text-white">By Group</h2>
         {(groupStats ?? []).map((row: any) => (
-          <div key={row.group_id} className="surface grid gap-2.5 p-3 sm:grid-cols-[1fr_repeat(5,auto)] sm:items-center">
+          <div
+            key={row.group_id}
+            className="surface grid gap-2.5 p-3 sm:grid-cols-[1fr_repeat(5,auto)] sm:items-center"
+          >
             <div className="font-black">{row.groups?.name ?? "Group"}</div>
             <div>{row.matches} Matches</div>
             <div>{row.goals} Goals</div>
