@@ -1,5 +1,6 @@
 import { jsonError, requireGroupRole } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { withPlayerPhotoUrls } from "@/lib/playerPhotos";
 
 export async function POST(request: Request) {
   try {
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
       .single();
 
     if (error) throw error;
-    return Response.json({ event: data });
+    return Response.json({ event: withPlayerPhotoUrls(data) });
   } catch (error) {
     return jsonError(error);
   }

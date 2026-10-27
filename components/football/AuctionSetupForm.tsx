@@ -3,7 +3,7 @@
 import { PlayerAvatar } from "@/components/football/PlayerAvatar";
 import { ArrowLeft, ArrowRight, Check, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 type Player = {
   id: string;
@@ -71,6 +71,7 @@ export function AuctionSetupForm({
   const [step, setStep] = useState<"captains" | "auctioneer" | "players">("captains");
   const [activeTeamId, setActiveTeamId] = useState(setupTeams[0]?.id ?? "");
   const [saving, setSaving] = useState(false);
+  const [opening, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const visiblePlayers = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -111,14 +112,8 @@ export function AuctionSetupForm({
     }
   }, [activeTeamId, setupTeams]);
 
-  useEffect(() => {
-    if (canManage && setupTeams.length < 2) {
-      router.refresh();
-    }
-  }, [canManage, router, setupTeams.length]);
-
   async function saveSetup() {
-    if (saving) return;
+    if (saving || opening) return;
     setMessage("");
     setSaving(true);
     const payload = setupTeams.map((team) => ({ id: team.id, captainId: captains[team.id] }));
@@ -139,8 +134,7 @@ export function AuctionSetupForm({
         setSaving(false);
         return;
       }
-      setMessage("Setup saved.");
-      router.refresh();
+      startTransition(() => router.refresh());
     } catch {
       setMessage("Connection interrupted. Please try again.");
     } finally {
@@ -361,11 +355,11 @@ export function AuctionSetupForm({
           </div>
           <button
             className="btn-primary w-full sm:w-fit"
-            disabled={saving || auctionPlayerCount < 1}
+            disabled={saving || opening || auctionPlayerCount < 1}
             type="button"
             onClick={saveSetup}
           >
-            {saving ? "Saving..." : "Open auction room"} <ArrowRight size={15} />
+            {saving ? "Saving..." : opening ? "Opening room..." : "Open auction room"} <ArrowRight size={15} />
           </button>
         </div>
       )}

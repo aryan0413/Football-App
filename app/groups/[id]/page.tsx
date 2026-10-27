@@ -1,6 +1,7 @@
 import { GroupRoom } from "@/components/football/GroupRoom";
 import { getCurrentAppUser } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { withPlayerPhotoUrls } from "@/lib/playerPhotos";
 import { redirect } from "next/navigation";
 
 export default async function GroupPage({
@@ -34,7 +35,7 @@ export default async function GroupPage({
       .order("joined_at", { ascending: true }),
     supabase
       .from("matches")
-      .select("id, group_id, scheduled_date, match_time, location, maximum_players, status, groups(name), match_availability(status)")
+      .select("id, group_id, scheduled_date, match_time, location, maximum_players, status, auctions(status), groups(name), match_availability(status)")
       .eq("group_id", id)
       .order("scheduled_date", { ascending: false }),
     supabase
@@ -59,7 +60,7 @@ export default async function GroupPage({
       <GroupRoom
         group={(membership.groups as any)}
         role={membership.role}
-        members={(membersResult.data ?? []) as any}
+        members={withPlayerPhotoUrls(membersResult.data ?? []) as any}
         matches={(matchesResult.data ?? []) as any}
         leaderboard={leaderboard as any}
         initialPanel={panel}

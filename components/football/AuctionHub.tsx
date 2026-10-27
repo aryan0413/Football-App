@@ -3,7 +3,7 @@
 import { PlayerAvatar } from "@/components/football/PlayerAvatar";
 import { Gavel, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
 type AuctionGroup = {
   role: string;
@@ -25,20 +25,29 @@ type AuctionPlayer = {
 
 export function AuctionHub({
   groups,
-  playersByGroup
+  playersByGroup,
+  activeByGroup = {}
 }: {
   groups: AuctionGroup[];
   playersByGroup: Record<string, AuctionPlayer[]>;
+  activeByGroup?: Record<string, string>;
 }) {
   const router = useRouter();
   const [selectedGroupId, setSelectedGroupId] = useState(groups[0]?.groups.id ?? "");
   const [message, setMessage] = useState("");
   const [starting, setStarting] = useState(false);
+  const [navigating, startTransition] = useTransition();
   const selectedGroup = groups.find((item) => item.groups.id === selectedGroupId);
   const players = selectedGroupId ? (playersByGroup[selectedGroupId] ?? []) : [];
+  const activeRoom = activeByGroup[selectedGroupId];
+  const canCreate = ["OWNER", "ADMIN"].includes(selectedGroup?.role ?? "");
 
   async function startAuction() {
-    if (starting) return;
+    if (starting || navigating) return;
+    if (activeRoom) {
+      startTransition(() => router.push(`/auction?matchId=${activeRoom}`));
+      return;
+    }
     setMessage("");
     setStarting(true);
     try {
@@ -53,7 +62,7 @@ export function AuctionHub({
         setStarting(false);
         return;
       }
-      router.push(`/auction?matchId=${data.matchId}`);
+      startTransition(() => router.push(`/auction?matchId=${data.matchId}`));
     } catch {
       setMessage("Connection interrupted. Please try again.");
     } finally {
@@ -93,14 +102,15 @@ export function AuctionHub({
           </div>
           <button
             className="btn-primary w-full"
-            disabled={starting || !selectedGroupId || players.length < 1}
+            disabled={starting || navigating || !selectedGroupId || (!activeRoom && (!canCreate || players.length < 4))}
             type="button"
             onClick={startAuction}
           >
             <Gavel size={18} />
-            {starting ? "Starting..." : "Start Auction"}
+            {starting || navigating ? "Opening room..." : activeRoom ? "Rejoin Auction" : "Start Auction"}
           </button>
           {message ? <p className="rounded-lg bg-white/14 p-3 text-sm font-bold text-white">{message}</p> : null}
+          {!activeRoom && players.length < 4 ? <p className="text-sm text-white/70">Add two captains, an auctioneer and at least one auction player.</p> : null}
         </div>
       </div>
 

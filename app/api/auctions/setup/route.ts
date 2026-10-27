@@ -1,5 +1,5 @@
 import { jsonError, requireGroupRole } from "@/lib/auth";
-import { emptyAuctionState, serializeAuctionState } from "@/lib/auctionLive";
+import { emptyAuctionState, parseAuctionState, serializeAuctionState } from "@/lib/auctionLive";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function POST(request: Request) {
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const auctioneerId = String(body.auctioneerId ?? "");
     const playerIds: string[] = Array.isArray(body.playerIds) ? body.playerIds.map((id: unknown) => String(id)).filter(Boolean) : [];
 
-    if (!matchId || teams.length < 2 || !auctioneerId || playerIds.length < 1) {
+    if (!matchId || teams.length !== 2 || new Set(teams.map((team: any) => team.id)).size !== 2 || !auctioneerId || playerIds.length < 1) {
       return Response.json({ error: "Choose two captains, one auctioneer, and at least one auction player." }, { status: 400 });
     }
 
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     const { data: match, error: matchError } = await supabase
       .from("matches")
-      .select("id, group_id")
+      .select("id, group_id, status, notes")
       .eq("id", matchId)
       .maybeSingle();
 
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       .eq("match_id", matchId)
       .maybeSingle();
     if (auctionError) throw auctionError;
-    if (auction && auction.status !== "DRAFT") {
+    if (!auction || auction.status !== "DRAFT" || match.status !== "AUCTION" || parseAuctionState(match.notes).status !== "DRAFT") {
       return Response.json({ error: "Auction setup can only be changed before the auction starts." }, { status: 400 });
     }
 
@@ -65,6 +65,12 @@ export async function POST(request: Request) {
       match_id: matchId,
       captain_id: String(team.captainId ?? "")
     })).filter((team: any) => team.id && team.captain_id);
+
+    const { data: actualTeams, error: actualTeamError } = await supabase.from("teams").select("id").eq("match_id", matchId);
+    if (actualTeamError) throw actualTeamError;
+    if (teamUpdates.length !== 2 || teamUpdates.some((team: any) => !actualTeams?.some((actual: { id: string }) => actual.id === team.id))) {
+      return Response.json({ error: "Choose the two teams belonging to this auction." }, { status: 400 });
+    }
 
     for (const team of teamUpdates) {
       const { error: teamError } = await supabase
@@ -94,6 +100,7 @@ export async function POST(request: Request) {
 
     const setupState = {
       ...emptyAuctionState("DRAFT"),
+      version: parseAuctionState(match.notes).version + 1,
       auctioneerId,
       order: Array.from(new Set(playerIds))
     };

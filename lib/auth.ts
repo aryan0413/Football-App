@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import type { AppUser, GroupRole } from "@/lib/types";
+import { cache } from "react";
+import { withPlayerPhotoUrls } from "@/lib/playerPhotos";
 
 export async function requireClerkUserId() {
   const { userId } = await auth();
@@ -10,7 +12,7 @@ export async function requireClerkUserId() {
   return userId;
 }
 
-export async function getCurrentAppUser() {
+export const getCurrentAppUser = cache(async () => {
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) return null;
 
@@ -22,11 +24,15 @@ export async function getCurrentAppUser() {
     .maybeSingle();
 
   if (error) throw error;
-  return data as AppUser | null;
-}
+  return withPlayerPhotoUrls(data) as AppUser | null;
+});
 
 export async function requireAppUser() {
-  const user = await getCurrentAppUser();
+  const clerkUserId = await requireClerkUserId();
+  const { data: user, error } = await getSupabaseAdmin().from("users")
+    .select("id, clerk_user_id, username, display_name, preferred_position, secondary_position, created_at")
+    .eq("clerk_user_id", clerkUserId).maybeSingle();
+  if (error) throw error;
   if (!user) {
     throw new Response("Profile required", { status: 409 });
   }

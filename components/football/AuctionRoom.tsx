@@ -159,6 +159,7 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
   const setSnapshot = useCallback((next: Snapshot | ((current: Snapshot) => Snapshot)) => {
     setSnapshotState((current) => {
       const resolved = typeof next === "function" ? (next as (current: Snapshot) => Snapshot)(current) : next;
+      if (resolved.state.version < current.state.version) return current;
       snapshotRef.current = resolved;
       return resolved;
     });
@@ -206,9 +207,11 @@ export function AuctionRoom({ matchId, initialSnapshot, currentUserId, canManage
           const current = snapshotRef.current;
           const previous = current.state;
           const state = parseAuctionNotes(payload.new.notes, previous);
+          if (state.version < previous.version) return;
           const needsFullSync =
             state.currentPlayerId !== previous.currentPlayerId ||
-            Object.keys(state.completed).length !== Object.keys(previous.completed).length;
+            Object.keys(state.completed).length !== Object.keys(previous.completed).length ||
+            state.status === "DRAFT" || previous.status === "DRAFT";
           setSnapshot(applyAuctionState(current, state));
 
           if (needsFullSync) {

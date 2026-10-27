@@ -110,6 +110,11 @@ export async function POST(request: Request) {
       const [frame] = snapshot.state.undoStack ?? [];
       if (!frame) return Response.json({ error: "Nothing to undo." }, { status: 400 });
 
+      const nextState = { ...frame.state, bidHistory: snapshot.state.bidHistory.filter((bid) => bid.id !== frame.bidId),
+        undoStack: snapshot.state.undoStack.slice(1) } as AuctionControlState;
+      const written = await writeAuctionStateCas(supabase, matchId, previousNotes, nextState);
+      if (!written) return Response.json({ error: "Auction changed. Sync and try again." }, { status: 409 });
+
       if (frame.bidId) {
         const { error: bidDeleteError } = await supabase.from("auction_bids").delete().eq("id", frame.bidId);
         if (bidDeleteError) throw bidDeleteError;
@@ -123,9 +128,6 @@ export async function POST(request: Request) {
         if (playerDeleteError) throw playerDeleteError;
       }
 
-      const nextState = frame.state as AuctionControlState;
-      const written = await writeAuctionStateCas(supabase, matchId, previousNotes, nextState);
-      if (!written) return Response.json({ error: "Auction changed. Sync and try again." }, { status: 409 });
       return freshResponse(supabase, matchId);
     }
 
@@ -144,7 +146,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "RESUME") {
-      if (!["PAUSED", "DRAFT"].includes(snapshot.state.status)) {
+      if (snapshot.state.status !== "PAUSED") {
         return Response.json({ error: "Only a stopped auction can be resumed." }, { status: 400 });
       }
       nextState = {

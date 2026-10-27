@@ -1,6 +1,7 @@
 import { LiveMatchRoom } from "@/components/football/LiveMatchRoom";
 import { getCurrentAppUser } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { withPlayerPhotoUrls } from "@/lib/playerPhotos";
 import { redirect } from "next/navigation";
 
 export default async function MatchRoomPage({ params }: { params: Promise<{ id: string }> }) {
@@ -50,7 +51,7 @@ export default async function MatchRoomPage({ params }: { params: Promise<{ id: 
         <h1 className="text-4xl font-black">{(match as any).groups?.name ?? "Football Match"}</h1>
         <p className="text-sm font-medium text-white/62">{match.scheduled_date} at {match.match_time} - {match.location}</p>
       </header>
-      <LiveMatchRoom match={match} teams={(teams ?? []) as any} players={players as any} events={(events ?? []) as any} ratings={(ratings ?? []) as any} canManage={canManage} />
+      <LiveMatchRoom match={match} teams={withPlayerPhotoUrls(teams ?? []) as any} players={withPlayerPhotoUrls(players) as any} events={withPlayerPhotoUrls(events ?? []) as any} ratings={(ratings ?? []) as any} canManage={canManage} />
     </div>
   );
 }

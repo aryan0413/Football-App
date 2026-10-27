@@ -1,4 +1,5 @@
 import { AUCTION_BASE_PRICE, nextRequiredBid } from "@/lib/auctionRules";
+import { withPlayerPhotoUrls } from "@/lib/playerPhotos";
 
 export type AuctionControlStatus = "DRAFT" | "LIVE" | "PAUSED" | "ENDED";
 export type AuctionPlayerResult = "SOLD" | "UNSOLD" | "SKIPPED";
@@ -84,7 +85,10 @@ export function parseAuctionState(notes: string | null | undefined, fallbackStat
         ...parsed,
         completed: parsed.completed ?? {},
         bidHistory: Array.isArray(parsed.bidHistory) ? parsed.bidHistory : [],
-        undoStack: Array.isArray(parsed.undoStack) ? parsed.undoStack.slice(0, 30) : [],
+        undoStack: Array.isArray(parsed.undoStack) ? parsed.undoStack.slice(0, 30).map((frame: AuctionUndoFrame) => {
+          const { undoStack: _nested, ...previousState } = frame.state;
+          return { ...frame, state: previousState };
+        }) : [],
         auctioneerId: typeof parsed.auctioneerId === "string" ? parsed.auctioneerId : null,
         order: Array.isArray(parsed.order) ? parsed.order : []
       } as AuctionControlState;
@@ -96,7 +100,8 @@ export function parseAuctionState(notes: string | null | undefined, fallbackStat
 }
 
 export function serializeAuctionState(state: AuctionControlState) {
-  return JSON.stringify(state);
+  const { kind, version, ...rest } = state;
+  return JSON.stringify({ kind, version, ...rest });
 }
 
 export function normalizeAuctionState(
@@ -132,7 +137,6 @@ export function normalizeAuctionState(
 
   if (auctionStatus === "ENDED") status = "ENDED";
   if (auctionStatus === "LIVE" && status === "DRAFT") status = "LIVE";
-  if (auctionStatus === "DRAFT" && status !== "ENDED") status = "DRAFT";
 
   if (status === "LIVE" && !currentPlayerId) {
     currentPlayerId = nextAuctionPlayerId({ ...state, order, completed, currentPlayerId: null }, selectedPlayerIds);
@@ -181,13 +185,11 @@ export function pushAuctionUndo(
   action: AuctionUndoFrame["action"],
   extra: Pick<AuctionUndoFrame, "bidId" | "teamPlayer"> = {}
 ) {
+  const { undoStack: _history, ...previousState } = state;
   const frame: AuctionUndoFrame = {
     id: crypto.randomUUID(),
     action,
-    state: {
-      ...state,
-      undoStack: state.undoStack ?? []
-    },
+    state: { ...previousState, bidHistory: [] },
     ...extra,
     at: new Date().toISOString()
   };
@@ -200,8 +202,8 @@ function readyRoleForUser(userId: string, captainTeamByUser: Map<string, string>
   return captainTeamByUser.has(userId) ? `CAPTAIN:${captainTeamByUser.get(userId)}` : "OWNER";
 }
 
-export async function getAuctionSnapshot(supabase: any, matchId: string): Promise<AuctionSnapshot> {
-  const { data: match, error: matchError } = await supabase
+export async function getAuctionSnapshot(supabase: any, matchId: string, knownMatch?: any): Promise<AuctionSnapshot> {
+  const { data: match, error: matchError } = knownMatch ? { data: knownMatch, error: null } : await supabase
     .from("matches")
     .select("id, group_id, scheduled_date, match_time, location, maximum_players, status, notes, groups(name)")
     .eq("id", matchId)
@@ -209,7 +211,7 @@ export async function getAuctionSnapshot(supabase: any, matchId: string): Promis
   if (matchError) throw matchError;
   if (!match) throw new Error("Match not found.");
 
-  const [{ data: auction, error: auctionError }, { data: teams, error: teamsError }, { data: selectedRows, error: selectedError }] = await Promise.all([
+  const [{ data: auction, error: auctionError }, { data: teams, error: teamsError }, { data: selectedRows, error: selectedError }, { data: readyAvailability, error: readyError }] = await Promise.all([
     supabase.from("auctions").select("*").eq("match_id", matchId).maybeSingle(),
     supabase
       .from("teams")
@@ -221,11 +223,13 @@ export async function getAuctionSnapshot(supabase: any, matchId: string): Promis
       .select("user_id, created_at, users(id, display_name, username, preferred_position, profile_image)")
       .eq("match_id", matchId)
       .eq("status", "PLAYING")
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase.from("match_availability").select("user_id").eq("match_id", matchId).eq("status", "MAYBE")
   ]);
   if (auctionError) throw auctionError;
   if (teamsError) throw teamsError;
   if (selectedError) throw selectedError;
+  if (readyError) throw readyError;
 
   const selectedPlayers = (selectedRows ?? []).map((row: any) => row.users).filter(Boolean);
   const selectedPlayerIds = selectedPlayers.map((player: any) => player.id);
@@ -293,19 +297,12 @@ export async function getAuctionSnapshot(supabase: any, matchId: string): Promis
       .filter((team: any) => team.captain_id)
       .map((team: any) => [String(team.captain_id), String(team.id)])
   );
-  const { data: readyAvailability, error: readyError } = await supabase
-    .from("match_availability")
-    .select("user_id")
-    .eq("match_id", matchId)
-    .eq("status", "MAYBE");
-  if (readyError) throw readyError;
-
   const readyRows = (readyAvailability ?? []).map((row: any) => ({
     user_id: row.user_id,
     role: readyRoleForUser(row.user_id, captainTeamByUser, state.auctioneerId)
   }));
 
-  return {
+  return withPlayerPhotoUrls({
     auction,
     match,
     state,
@@ -317,16 +314,21 @@ export async function getAuctionSnapshot(supabase: any, matchId: string): Promis
     completedPlayers,
     bids: bids ?? [],
     readyRows
-  };
+  });
 }
 
 export async function writeAuctionStateCas(supabase: any, matchId: string, previousNotes: string | null, nextState: AuctionControlState) {
+  const previousState = parseAuctionState(previousNotes);
+  const prefix = `{"kind":"football-auction-state-v1","version":${previousState.version},`;
+  const savedState = bumpAuctionState({ ...nextState, version: previousState.version });
   let query = supabase
     .from("matches")
-    .update({ notes: serializeAuctionState(bumpAuctionState(nextState)) })
+    .update({ notes: serializeAuctionState(savedState) })
     .eq("id", matchId);
 
-  query = previousNotes === null ? query.is("notes", null) : query.eq("notes", previousNotes);
+  // Compare the monotonic version without putting the entire history in the URL.
+  query = previousNotes === null ? query.is("notes", null)
+    : previousNotes.startsWith(prefix) ? query.like("notes", `${prefix}%`) : query.eq("notes", previousNotes);
   const { data, error } = await query.select("id, notes").maybeSingle();
   if (error) throw error;
   return data;

@@ -39,7 +39,8 @@ export function GroupRoom({ group, role, members, matches, leaderboard, initialP
   const [auctionStarting, setAuctionStarting] = useState(false);
   const canManage = role === "OWNER" || role === "ADMIN";
   const canChangeRoles = role === "OWNER";
-  const activeAuction = matches.find((match) => match.status === "AUCTION");
+  const activeAuction = matches.find((match) => match.status === "AUCTION" &&
+    (Array.isArray(match.auctions) ? match.auctions[0] : match.auctions)?.status !== "ENDED");
   const playableMatches = matches.filter((match) => match.status !== "AUCTION");
   const nextMatch = playableMatches.find((match) => match.status !== "ENDED");
   const completedMatches = playableMatches.filter((match) => match.status === "ENDED");
@@ -129,6 +130,7 @@ export function GroupRoom({ group, role, members, matches, leaderboard, initialP
     }
     setAuctionStarting(true);
     setMessage("");
+    try {
     const response = await fetch("/api/auctions/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -141,6 +143,10 @@ export function GroupRoom({ group, role, members, matches, leaderboard, initialP
       return;
     }
     router.push(`/auction?matchId=${data.matchId}`);
+    } catch {
+      setMessage("Connection interrupted. Please try again.");
+      setAuctionStarting(false);
+    }
   }
 
   return (
@@ -281,7 +287,7 @@ export function GroupRoom({ group, role, members, matches, leaderboard, initialP
               <p className="text-xs font-black uppercase tracking-wide text-white/62">Auction</p>
               <h2 className="text-2xl font-black text-white">Auction Room</h2>
               <p className="mt-2 text-sm text-white/68">{activeAuction ? "Active auction ready." : "Create teams from group players."}</p>
-              <button className="btn-primary mt-5 w-full" disabled={auctionStarting} type="button" onClick={startAuction}><Gavel size={18} /> {auctionStarting ? "Starting..." : activeAuction ? "Join Back Auction" : "Start Auction"}</button>
+              <button className="btn-primary mt-5 w-full" disabled={auctionStarting || (!activeAuction && !canManage)} type="button" onClick={startAuction}><Gavel size={18} /> {auctionStarting ? "Opening room..." : activeAuction ? "Join Back Auction" : "Start Auction"}</button>
             </div>
           </div>
           <div className="surface p-3 sm:p-4">
