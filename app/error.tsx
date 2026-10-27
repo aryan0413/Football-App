@@ -15,7 +15,9 @@ export default function PageError({ retry }: { error: Error & { digest?: string 
         </span>
         <div>
           <h1 className="text-2xl font-semibold">Unable to load this page</h1>
-          <p className="mt-3 text-sm text-[var(--muted)]">Check your connection and try again.</p>
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            The app couldn&apos;t load the data for this page. Please try again shortly.
+          </p>
         </div>
         <div className="flex gap-2">
           <button className="btn-primary" type="button" disabled={pending} onClick={() => startTransition(retry)}>
