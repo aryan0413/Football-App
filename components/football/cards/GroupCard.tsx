@@ -76,8 +76,8 @@ export function GroupCard({ group, role, memberCount, nextMatch }: GroupCardProp
             <ShieldCheck size={18} />
             Open Group
           </Link>
-          <Link className="btn-secondary" href={`/groups/${group.id}?panel=schedule`}>
-            Schedule Match
+          <Link className="btn-secondary" href={`/groups/${group.id}?panel=${["OWNER", "ADMIN"].includes(role) ? "schedule" : "matches"}`}>
+            {["OWNER", "ADMIN"].includes(role) ? "Schedule Match" : "View Matches"}
             <ChevronRight size={18} />
           </Link>
         </div>

@@ -87,7 +87,9 @@ export async function PATCH(request: Request) {
     if (status === "ACCEPTED") {
       const { error: memberError } = await supabase
         .from("group_members")
-        .upsert({ group_id: invitation.group_id, user_id: user.id, role: "PLAYER" }, { onConflict: "group_id,user_id" });
+        .upsert({ group_id: invitation.group_id, user_id: user.id, role: "PLAYER" }, {
+          onConflict: "group_id,user_id", ignoreDuplicates: true
+        });
 
       if (memberError) throw memberError;
     }

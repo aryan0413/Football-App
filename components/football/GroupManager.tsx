@@ -2,7 +2,7 @@
 
 import { Gavel, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { GroupCard } from "@/components/football/cards/GroupCard";
 
 type Membership = {
@@ -16,12 +16,17 @@ type Membership = {
   };
 };
 
-export function GroupManager({ memberships }: { memberships: Membership[] }) {
+export function GroupManager({ memberships, activeByGroup = {} }: {
+  memberships: Membership[];
+  activeByGroup?: Record<string, string>;
+}) {
   const router = useRouter();
   const [items, setItems] = useState(memberships);
   const [message, setMessage] = useState("");
   const [createOpen, setCreateOpen] = useState(!memberships.length);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [openingGroupId, setOpeningGroupId] = useState("");
+  const [navigating, startTransition] = useTransition();
   useEffect(() => setItems(memberships), [memberships]);
 
   async function createGroup(formData: FormData) {
@@ -62,18 +67,37 @@ export function GroupManager({ memberships }: { memberships: Membership[] }) {
   }
 
   async function startAuction(groupId: string) {
-    setMessage("");
-    const response = await fetch("/api/auctions/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groupId })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setMessage(data.error ?? "Could not start auction.");
+    if (openingGroupId || navigating) return;
+    const membership = items.find((item) => item.groups.id === groupId);
+    const activeRoom = activeByGroup[groupId];
+    if (!activeRoom && !["OWNER", "ADMIN"].includes(membership?.role ?? "")) {
+      setMessage("Only a group owner or admin can start an auction.");
       return;
     }
-    router.push(`/auction?matchId=${data.matchId}`);
+    setMessage("");
+    setOpeningGroupId(groupId);
+    if (activeRoom) {
+      startTransition(() => router.push(`/auction?matchId=${activeRoom}`));
+      setOpeningGroupId("");
+      return;
+    }
+    try {
+      const response = await fetch("/api/auctions/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setMessage(data.error ?? (response.status === 403 ? "Only a group owner or admin can start an auction." : "Could not start auction."));
+        return;
+      }
+      startTransition(() => router.push(`/auction?matchId=${data.matchId}`));
+    } catch {
+      setMessage("Connection interrupted. Please try again.");
+    } finally {
+      setOpeningGroupId("");
+    }
   }
 
   return (
@@ -127,14 +151,16 @@ export function GroupManager({ memberships }: { memberships: Membership[] }) {
         {items.map((membership) => (
           <div key={membership.groups.id} className="group-card-stack grid gap-3">
             <GroupCard group={membership.groups} role={membership.role} memberCount={membership.groups.member_count} />
-            <button
+            {activeByGroup[membership.groups.id] || ["OWNER", "ADMIN"].includes(membership.role) ? <button
               className="group-auction-control btn-dark w-full"
               type="button"
+              disabled={Boolean(openingGroupId) || navigating}
               onClick={() => startAuction(membership.groups.id)}
             >
               <Gavel size={18} />
-              Start Auction Now
-            </button>
+              {openingGroupId === membership.groups.id || navigating ? "Opening room..."
+                : activeByGroup[membership.groups.id] ? "Rejoin Auction" : "Start Auction Now"}
+            </button> : <p className="px-1 text-sm text-[var(--muted)]">Only a group owner or admin can start an auction.</p>}
           </div>
         ))}
 

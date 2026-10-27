@@ -2,27 +2,38 @@ import { getCurrentAppUser } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { GroupManager } from "@/components/football/GroupManager";
 import { redirect } from "next/navigation";
+import { parseAuctionState } from "@/lib/auctionLive";
 
 export default async function GroupsPage() {
   const user = await getCurrentAppUser();
   if (!user) redirect("/");
 
   const supabase = getSupabaseAdmin();
-  const { data: memberships } = await supabase
+  const { data: memberships, error: membershipsError } = await supabase
     .from("group_members")
     .select("role, groups(id, name, logo, description, created_at)")
     .eq("user_id", user.id);
+  if (membershipsError) throw membershipsError;
   const footballMemberships = (memberships ?? []).filter((membership: any) => {
     const name = String(membership.groups?.name ?? "");
     return name && !name.includes("@") && !name.toLowerCase().includes("'s org");
   });
   const visibleMemberships = footballMemberships.length ? footballMemberships : (memberships ?? []);
   const groupIds = visibleMemberships.map((membership: any) => membership.groups.id);
-  const { data: memberRows } = groupIds.length
-    ? await supabase.from("group_members").select("group_id").in("group_id", groupIds)
-    : { data: [] };
+  const [membersResult, roomsResult] = groupIds.length ? await Promise.all([
+    supabase.from("group_members").select("group_id").in("group_id", groupIds),
+    supabase.from("matches").select("id, group_id, notes, auctions(status)").in("group_id", groupIds)
+      .eq("status", "AUCTION").order("created_at", { ascending: false })
+  ]) : [{ data: [], error: null }, { data: [], error: null }];
+  if (membersResult.error) throw membersResult.error;
+  if (roomsResult.error) throw roomsResult.error;
+  const activeByGroup: Record<string, string> = {};
+  for (const row of roomsResult.data ?? [] as any[]) {
+    const auction = Array.isArray(row.auctions) ? row.auctions[0] : row.auctions;
+    if (auction?.status !== "ENDED" && parseAuctionState(row.notes).status !== "ENDED") activeByGroup[row.group_id] ??= row.id;
+  }
   const memberCounts = new Map<string, number>();
-  (memberRows ?? []).forEach((row: { group_id: string }) =>
+  (membersResult.data ?? []).forEach((row: { group_id: string }) =>
     memberCounts.set(row.group_id, (memberCounts.get(row.group_id) ?? 0) + 1)
   );
   const groupsWithCounts = visibleMemberships.map((membership: any) => ({
@@ -42,7 +53,7 @@ export default async function GroupsPage() {
         </div>
       </header>
 
-      <GroupManager memberships={groupsWithCounts as any} />
+      <GroupManager memberships={groupsWithCounts as any} activeByGroup={activeByGroup} />
     </div>
   );
 }

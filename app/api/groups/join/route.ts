@@ -25,7 +25,9 @@ export async function POST(request: Request) {
     const group = groups[0];
     const { error: memberError } = await supabase
       .from("group_members")
-      .upsert({ group_id: group.id, user_id: user.id, role: "PLAYER" }, { onConflict: "group_id,user_id" });
+      .upsert({ group_id: group.id, user_id: user.id, role: group.created_by === user.id ? "OWNER" : "PLAYER" }, {
+        onConflict: "group_id,user_id", ignoreDuplicates: true
+      });
 
     if (memberError) throw memberError;
     return Response.json({ group });

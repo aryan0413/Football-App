@@ -7,7 +7,7 @@ import { withPlayerPhotoUrls } from "@/lib/playerPhotos";
 export async function requireClerkUserId() {
   const { userId } = await auth();
   if (!userId) {
-    throw new Response("Unauthorized", { status: 401 });
+    throw Response.json({ error: "Please sign in to continue." }, { status: 401 });
   }
   return userId;
 }
@@ -34,7 +34,7 @@ export async function requireAppUser() {
     .eq("clerk_user_id", clerkUserId).maybeSingle();
   if (error) throw error;
   if (!user) {
-    throw new Response("Profile required", { status: 409 });
+    throw Response.json({ error: "Create your football profile to continue." }, { status: 409 });
   }
   return user;
 }
@@ -51,7 +51,9 @@ export async function requireGroupRole(groupId: string, allowed: GroupRole[]) {
 
   if (error) throw error;
   if (!data || !allowed.includes(data.role as GroupRole)) {
-    throw new Response("Forbidden", { status: 403 });
+    throw Response.json({ error: allowed.length === 1 && allowed[0] === "OWNER"
+      ? "Only the group owner can do this."
+      : "Only a group owner or admin can do this." }, { status: 403 });
   }
 
   return { user, role: data.role as GroupRole };

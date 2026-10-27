@@ -73,6 +73,26 @@ async function unitChecks() {
   assert.equal(metadata.width, 256);
   assert.equal(metadata.height, 256);
   console.log("PASS bounded undo history, photo URL normalization and authenticated/cached WebP endpoint");
+  const actualAuth = load("lib/auth.ts");
+  database = { from(table) {
+    let userId;
+    return { select(columns) {
+      if (table === "users") assert.ok(!columns.includes("profile_image"), "API auth must not fetch image bodies");
+      return this;
+    }, eq(column, value) { if (column === "clerk_user_id" || column === "user_id") userId = value; return this; },
+    async maybeSingle() { return { data: table === "users" ? { id: userId } : { role: userId }, error: null }; } };
+  } };
+  for (const role of ["OWNER", "ADMIN"]) {
+    assert.equal((await context.run({ id: role }, () => actualAuth.requireGroupRole("group", ["OWNER", "ADMIN"]))).role, role);
+  }
+  try {
+    await context.run({ id: "PLAYER" }, () => actualAuth.requireGroupRole("group", ["OWNER", "ADMIN"]));
+    assert.fail("Player role must not be able to start auctions");
+  } catch (error) {
+    assert.equal(error.status, 403);
+    assert.match((await error.json()).error, /group owner or admin/);
+  }
+  console.log("PASS actual owner/admin permission checks and useful JSON denial messages");
 }
 
 async function integrationChecks() {
@@ -106,6 +126,22 @@ async function integrationChecks() {
     const [owner, captainA, captainB, auctioneer, player] = createdUsers;
     groupId = (await checked(database.from("groups").insert({ name: `${prefix} isolated auction checks`, created_by: owner.id }).select("id").single())).id;
     await checked(database.from("group_members").insert(createdUsers.map((user, i) => ({ group_id: groupId, user_id: user.id, role: i === 0 ? "OWNER" : "PLAYER" }))));
+    const group = await checked(database.from("groups").select("name").eq("id", groupId).single());
+    const join = load("app/api/groups/join/route.ts").POST;
+    const invitations = load("app/api/groups/invitations/route.ts").PATCH;
+    await checked(database.from("group_members").update({ role: "ADMIN" }).eq("group_id", groupId).eq("user_id", captainA.id));
+    for (const [user, role] of [[owner, "OWNER"], [captainA, "ADMIN"], [player, "PLAYER"]]) {
+      const joined = await context.run(user, () => join(new Request("http://localhost/api/groups/join", { method: "POST", body: JSON.stringify({ groupName: group.name, role: "OWNER" }) })));
+      assert.equal(joined.status, 200);
+      const afterJoin = await checked(database.from("group_members").select("role").eq("group_id", groupId).eq("user_id", user.id).single());
+      assert.equal(afterJoin.role, role, "Joining again must neither demote admins nor promote players");
+      const invitation = await checked(database.from("group_invitations").insert({ group_id: groupId, invited_user_id: user.id, invited_by: owner.id, status: "PENDING" }).select("id").single());
+      const accepted = await context.run(user, () => invitations(new Request("http://localhost/api/groups/invitations", { method: "PATCH", body: JSON.stringify({ invitationId: invitation.id, status: "ACCEPTED" }) })));
+      assert.equal(accepted.status, 200);
+      const afterInvite = await checked(database.from("group_members").select("role").eq("group_id", groupId).eq("user_id", user.id).single());
+      assert.equal(afterInvite.role, role, "Accepting an invitation must preserve an existing membership role");
+    }
+    console.log("PASS real database: owner/admin roles preserved on rejoin and invitation acceptance; players cannot promote themselves");
     await call("start", player, { groupId }, 403);
     const [first, simultaneous] = await Promise.all([call("start", owner, { groupId }), call("start", owner, { groupId })]);
     const matchId = first.matchId;

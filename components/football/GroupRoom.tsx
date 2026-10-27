@@ -31,13 +31,13 @@ type GroupRoomProps = {
 
 export function GroupRoom({ group, role, members, matches, leaderboard, initialPanel }: GroupRoomProps) {
   const router = useRouter();
-  const [tab, setTab] = useState(initialPanel === "schedule" ? "matches" : "overview");
-  const [scheduleOpen, setScheduleOpen] = useState(initialPanel === "schedule");
+  const canManage = role === "OWNER" || role === "ADMIN";
+  const [tab, setTab] = useState(initialPanel === "schedule" || initialPanel === "matches" ? "matches" : "overview");
+  const [scheduleOpen, setScheduleOpen] = useState(canManage && initialPanel === "schedule");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [auctionStarting, setAuctionStarting] = useState(false);
-  const canManage = role === "OWNER" || role === "ADMIN";
   const canChangeRoles = role === "OWNER";
   const activeAuction = matches.find((match) => match.status === "AUCTION" &&
     (Array.isArray(match.auctions) ? match.auctions[0] : match.auctions)?.status !== "ENDED");
@@ -180,7 +180,7 @@ export function GroupRoom({ group, role, members, matches, leaderboard, initialP
 
       <div className="group-room-layout">
         <div className="grid gap-3">
-          {scheduleOpen ? (
+          {canManage && scheduleOpen ? (
             <form action={scheduleMatch} className="surface grid gap-3 p-4">
               <h2 className="text-xl font-black">Schedule Match</h2>
               <div className="grid gap-3 sm:grid-cols-2">
