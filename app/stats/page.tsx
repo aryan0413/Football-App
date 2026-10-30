@@ -17,10 +17,10 @@ export default async function StatsPage() {
 
   return (
     <div className="page-wrap">
-      <header className="py-3 text-white">
+      <header className="page-intro">
         <p className="eyebrow">Performance</p>
-        <h1 className="text-4xl font-black">My performance</h1>
-        <p className="text-sm font-medium text-white/62">{stats.matches} matches played</p>
+        <h1>My performance</h1>
+        <p>{stats.matches} matches played</p>
       </header>
       <StatGrid stats={stats} />
       <section className="mt-4 grid gap-2.5">

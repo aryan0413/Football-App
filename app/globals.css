@@ -2577,3 +2577,648 @@ textarea.field {
     animation: none !important;
   }
 }
+
+/* Product polish: restrained broadcast contrast and a denser work surface. */
+:root {
+  --background: #0d0f0e;
+  --foreground: #f4f6ef;
+  --muted: #93998d;
+  --line: #2a302a;
+  --panel: #151815;
+  --panel-soft: #1c211d;
+  --surface: #151815;
+  --surface-strong: #20251f;
+  --accent: #c6fa62;
+  --accent-dark: #c6fa62;
+  --success: #79dca0;
+  --warning: #f0c76d;
+  --danger: #f18a8d;
+  --navy: #11150f;
+  --ink: #f4f6ef;
+  --champion-shadow: 0 14px 32px #0000002b;
+  --soft-shadow: 0 5px 14px #0000001c;
+}
+
+body {
+  background: var(--background);
+  font-size: 14px;
+}
+
+.app-shell {
+  padding-top: 68px;
+}
+
+.page-wrap {
+  max-width: 1660px;
+  padding: 30px 32px 40px;
+}
+
+.page-wrap > header,
+.page-intro {
+  position: relative;
+  min-height: 84px;
+  margin-bottom: 22px;
+  padding: 2px 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.page-intro h1,
+.page-wrap > header h1 {
+  margin-top: 7px;
+  color: var(--foreground);
+  font-size: 32px;
+  line-height: 1.05;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.page-intro > p:not(.eyebrow),
+.page-intro > div > p:not(.eyebrow),
+.page-wrap > header p:not(.eyebrow) {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 450;
+}
+
+.page-intro-with-action {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  gap: 8px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.app-nav-panel {
+  width: 240px;
+  padding: 24px 14px 18px;
+  background: #111310;
+}
+
+.nav-brand {
+  margin: 0 10px 42px;
+  gap: 10px;
+}
+
+.brand-mark {
+  width: 38px;
+  height: 42px;
+  border-radius: 8px;
+}
+
+.brand-name {
+  font-size: 21px;
+  letter-spacing: 0;
+}
+
+.brand-subtitle {
+  margin-top: 5px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.nav-caption {
+  margin-bottom: 11px;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+}
+
+.nav-link {
+  min-height: 42px;
+  margin-bottom: 4px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.nav-link-active {
+  border-color: #c6fa622e;
+  background: #c6fa620d;
+}
+
+.workspace-bar {
+  min-height: 68px;
+  padding: 11px 32px;
+  background: #0d0f0e;
+}
+
+.workspace-actions {
+  gap: 14px;
+}
+
+.workspace-actions .btn-secondary {
+  min-height: 36px;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-dark {
+  min-height: 39px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #17200c;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #d6ff8e;
+}
+
+.btn-secondary,
+.btn-dark {
+  border-color: #343a32;
+  background: #1d211c;
+}
+
+.btn-secondary:hover:not(:disabled),
+.btn-dark:hover:not(:disabled) {
+  border-color: #707c60;
+  background: #262d23;
+}
+
+.surface,
+.team-pitch-card,
+.report-panel,
+.stat-card {
+  border-color: var(--line);
+  background: var(--panel);
+  box-shadow: var(--soft-shadow);
+}
+
+.data-row {
+  border-color: #30372f;
+  background: #191d19;
+}
+
+.data-row:hover {
+  border-color: #57614c;
+  background: #1c211d;
+}
+
+.field {
+  min-height: 42px;
+  border-color: #343b31;
+  background: #11140f;
+  color: var(--foreground);
+}
+
+.field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px #c6fa6214;
+}
+
+.status-chip {
+  border: 1px solid #c6fa6222;
+  background: #c6fa620d;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.status-chip-live {
+  border-color: #f18a8d26;
+  background: #f18a8d14;
+  color: #ff9a9c;
+}
+
+.groups-command-board {
+  gap: 20px;
+}
+
+.groups-actions-rail {
+  min-height: 42px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.app-notice {
+  max-width: min(100%, 460px);
+  padding: 10px 12px;
+  border: 1px solid #c6fa6224;
+  border-radius: 7px;
+  background: #c6fa620c;
+  color: #d7e8bc;
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.group-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  gap: 20px;
+}
+
+.group-card {
+  border-color: #30372f;
+  box-shadow: var(--champion-shadow);
+}
+
+.group-card-lightbar {
+  height: 4px;
+}
+
+.group-card-header h2 {
+  font-size: 21px;
+  letter-spacing: 0;
+}
+
+.group-card-metrics {
+  margin-top: 2px;
+  padding: 16px 0;
+}
+
+.club-metric {
+  padding-inline: 12px;
+}
+
+.group-role-badge {
+  border-color: #c6fa622c;
+  background: #c6fa620d;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.group-auction-control {
+  min-height: 43px;
+  border-color: #65734e;
+  background: #20261d;
+}
+
+.group-auction-control:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.fixture-card {
+  min-height: 92px;
+  border-color: #30372f;
+  background: var(--panel);
+  box-shadow: var(--soft-shadow);
+}
+
+.fixture-date strong,
+.performance-rating strong,
+.stat-card .text-3xl,
+.stat-card .text-4xl {
+  font-weight: 600;
+}
+
+.auction-hub-layout {
+  gap: 22px;
+}
+
+.auction-hub-setup {
+  gap: 16px;
+  padding: 18px;
+  border-top-width: 3px;
+}
+
+.auction-room-layout {
+  grid-template-columns: 250px minmax(460px, 1fr) 270px;
+  gap: 20px;
+}
+
+.auction-team-card {
+  padding: 15px;
+  border-color: #30372f;
+}
+
+.auction-command {
+  border-color: #637545;
+  background: #171d14;
+  box-shadow: var(--champion-shadow);
+}
+
+.auction-command-inner {
+  gap: 16px;
+}
+
+.auction-command-inner > .flex > div > h2 {
+  font-size: 27px;
+  letter-spacing: 0;
+}
+
+.auction-room-status {
+  gap: 8px;
+  padding: 13px 0;
+}
+
+.auction-room-status > div + div {
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+}
+
+.auction-player-identity {
+  gap: 14px;
+}
+
+.auction-player-identity > .player-avatar {
+  width: 76px;
+  height: 84px;
+}
+
+.auction-bid-display {
+  padding: 18px;
+  border-color: #46553a;
+  background: #11160e;
+}
+
+.auction-bid-display strong {
+  color: var(--accent);
+  font-size: 34px;
+  font-weight: 650;
+}
+
+.auction-bid-button {
+  min-height: 50px;
+  font-size: 14px;
+}
+
+.auction-rules-panel {
+  gap: 18px;
+}
+
+.auction-rules-panel .data-row {
+  border-bottom-color: #30372f;
+}
+
+.auction-setup-screen {
+  gap: 18px;
+  padding-top: 0;
+}
+
+.setup-progress {
+  gap: 22px;
+  padding-bottom: 18px;
+}
+
+.setup-progress-step > span {
+  border-radius: 6px;
+}
+
+.auction-captain-card {
+  min-height: 88px;
+  border-color: #333a31;
+  background: #181c18;
+}
+
+.auction-captain-card-active {
+  border-color: var(--accent);
+  background: #c6fa620b;
+}
+
+.auction-fast-grid,
+.auction-pool-grid {
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 10px;
+}
+
+.auction-fast-card,
+.auction-pool-card {
+  min-height: 68px;
+  border-color: #30372f;
+  background: #181c18;
+}
+
+.auction-fast-card:hover:not(:disabled),
+.auction-pool-card:hover:not(:disabled) {
+  border-color: #7d9262;
+  background: #1e251c;
+}
+
+.auction-fast-card-active,
+.auction-pool-card-active {
+  border-color: var(--accent);
+  background: #c6fa620e;
+}
+
+.scoreboard,
+.broadcast-scoreboard {
+  border-color: #445239;
+  background: #151b12;
+  box-shadow: var(--champion-shadow);
+}
+
+.broadcast-scoreboard {
+  padding: 22px;
+}
+
+.match-clock-pill {
+  min-width: 80px;
+  border-color: #c6fa6248;
+  background: #c6fa6210;
+  font-weight: 700;
+}
+
+.score-total span {
+  font-size: 68px;
+  font-weight: 650;
+}
+
+.team-crest {
+  width: 48px;
+  height: 51px;
+}
+
+.team-pitch-card {
+  box-shadow: var(--champion-shadow);
+}
+
+.team-pitch-header {
+  padding: 14px 15px;
+}
+
+.football-pitch {
+  min-height: 440px;
+}
+
+.football-pitch-content {
+  min-height: 406px;
+}
+
+.player-marker-photo {
+  width: 42px;
+  height: 42px;
+  border-color: #e9f5dc;
+  box-shadow: 0 3px 8px #00000042;
+}
+
+.player-marker-rating {
+  padding: 3px 6px;
+  font-weight: 700;
+}
+
+.report-panel {
+  padding: 18px;
+}
+
+.match-control-panel {
+  border-color: #51603f;
+  background: #171d14;
+  box-shadow: var(--champion-shadow);
+}
+
+.team-score-button,
+.player-tap-card {
+  border-color: #303a2b;
+  background: #1b2118;
+}
+
+.team-score-button:hover:not(:disabled),
+.player-tap-card:hover:not(:disabled),
+.player-tap-card-selected {
+  border-color: var(--accent);
+  background: #c6fa620f;
+}
+
+.profile-hero-card {
+  padding: 24px;
+  border-top: 3px solid var(--accent);
+  background: #171b16;
+  box-shadow: var(--champion-shadow);
+}
+
+.profile-hero-card h1 {
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.stat-grid {
+  gap: 12px;
+}
+
+.stat-card {
+  min-height: 108px;
+  padding: 16px;
+}
+
+@media (min-width: 1024px) {
+  .app-shell {
+    padding-left: 240px;
+  }
+
+  .workspace-bar {
+    left: 240px;
+  }
+
+  .auction-command {
+    position: sticky;
+    top: 86px;
+  }
+}
+
+@media (min-width: 1500px) {
+  .page-wrap {
+    padding: 34px 42px 44px;
+  }
+
+  .workspace-bar {
+    padding-inline: 42px;
+  }
+
+  .auction-room-layout {
+    grid-template-columns: 265px minmax(520px, 1fr) 286px;
+    gap: 24px;
+  }
+}
+
+@media (max-width: 1399px) {
+  .auction-room-layout {
+    grid-template-columns: 230px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-shell {
+    padding-top: 62px;
+  }
+
+  .page-wrap {
+    padding: 24px 20px 30px;
+  }
+
+  .auction-room-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 539px) {
+  .page-wrap {
+    padding: 20px 16px 28px;
+  }
+
+  .page-wrap > header,
+  .page-intro {
+    min-height: 0;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+  }
+
+  .page-intro h1,
+  .page-wrap > header h1 {
+    font-size: 27px;
+  }
+
+  .page-intro-with-action {
+    align-items: start;
+  }
+
+  .page-intro-with-action .btn-secondary {
+    min-height: 35px;
+    padding-inline: 10px;
+  }
+
+  .groups-command-board {
+    gap: 16px;
+  }
+
+  .groups-actions-rail {
+    padding-bottom: 16px;
+  }
+
+  .group-card-grid {
+    gap: 16px;
+  }
+
+  .group-card-body {
+    padding: 14px;
+  }
+
+  .auction-fast-grid,
+  .auction-pool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .auction-fast-card,
+  .auction-pool-card {
+    min-height: 64px;
+  }
+
+  .broadcast-scoreboard {
+    padding: 16px;
+  }
+
+  .score-total span {
+    font-size: 46px;
+  }
+
+  .football-pitch {
+    min-height: 420px;
+  }
+
+  .football-pitch-content {
+    min-height: 386px;
+  }
+}

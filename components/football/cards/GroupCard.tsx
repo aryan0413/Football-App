@@ -23,7 +23,7 @@ export function GroupCard({ group, role, memberCount, nextMatch }: GroupCardProp
   return (
     <article className="group-card surface overflow-hidden transition">
       <div className="group-card-lightbar" />
-      <div className="group-card-body grid gap-3 p-3 sm:p-4">
+      <div className="group-card-body grid gap-4 p-4">
         <div className="group-card-header">
           <div className="group-crest-shell">
             <img
@@ -39,7 +39,7 @@ export function GroupCard({ group, role, memberCount, nextMatch }: GroupCardProp
             <h2 className="truncate text-2xl font-black">{group.name}</h2>
             <p className="line-clamp-2 text-sm text-[var(--muted)]">{group.description ?? "Private football group"}</p>
           </div>
-          <span className="group-role-badge">{role}</span>
+          <span className="group-role-badge">{role.toLowerCase()}</span>
         </div>
 
         <div className="group-card-metrics">

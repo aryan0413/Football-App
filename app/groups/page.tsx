@@ -43,11 +43,11 @@ export default async function GroupsPage() {
 
   return (
     <div className="page-wrap">
-      <header className="group-page-hero app-hero p-5 text-white sm:p-6">
-        <div className="relative z-10">
-          <p className="eyebrow">Workspace / Groups</p>
-          <h1 className="mt-2 text-4xl font-black">My groups</h1>
-          <p className="text-sm font-medium text-white/62">
+      <header className="page-intro">
+        <div>
+          <p className="eyebrow">Clubs</p>
+          <h1>My groups</h1>
+          <p>
             {visibleMemberships.length} football {visibleMemberships.length === 1 ? "group" : "groups"}
           </p>
         </div>

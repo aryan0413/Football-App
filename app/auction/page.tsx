@@ -40,8 +40,8 @@ export default async function AuctionPage({ searchParams }: { searchParams: Prom
       if (auction?.status !== "ENDED" && parseAuctionState(row.notes).status !== "ENDED") activeByGroup[row.group_id] ??= row.id;
     }
     return <div className="page-wrap">
-      <header className="py-3 text-white"><p className="eyebrow">Auction</p><h1 className="text-4xl font-black">Auctions</h1>
-        <p className="text-sm font-medium text-white/62">{visible.length} groups available</p></header>
+      <header className="page-intro"><p className="eyebrow">Transfer desk</p><h1>Auctions</h1>
+        <p>{visible.length} groups available</p></header>
       <AuctionHub groups={visible as any} playersByGroup={playersByGroup} activeByGroup={activeByGroup} />
     </div>;
   }
@@ -68,9 +68,9 @@ export default async function AuctionPage({ searchParams }: { searchParams: Prom
     : { data: [], error: null };
   if (playersError) throw playersError;
   return <div className="page-wrap">
-    <header className="flex flex-wrap items-end justify-between gap-3 py-3 text-white"><div>
-      <p className="eyebrow">Auction Room</p><h1 className="text-4xl font-black">{(match as any).groups?.name ?? "Football"} Auction</h1>
-      <p className="text-sm font-medium text-white/62">{match.scheduled_date} at {match.match_time} - {match.location}</p>
+    <header className="page-intro page-intro-with-action"><div>
+      <p className="eyebrow">Auction room</p><h1>{(match as any).groups?.name ?? "Football"} Auction</h1>
+      <p>{match.scheduled_date} at {match.match_time} - {match.location}</p>
     </div><Link className="btn-secondary" href="/groups"><ArrowLeft size={18} /> Groups</Link></header>
     {needsSetup ? <AuctionSetupForm matchId={match.id} teams={setupTeams as any}
       players={withPlayerPhotoUrls((members ?? []).map((row: any) => row.users).filter(Boolean))}

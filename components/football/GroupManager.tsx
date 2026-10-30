@@ -101,8 +101,8 @@ export function GroupManager({ memberships, activeByGroup = {} }: {
   }
 
   return (
-    <section className="groups-command-board mt-3 grid gap-3">
-      <div className="groups-actions-rail flex flex-wrap items-center justify-between gap-3">
+    <section className="groups-command-board">
+      <div className="groups-actions-rail">
         <div className="flex flex-wrap gap-2">
           <button className="btn-primary" type="button" onClick={() => setCreateOpen((open) => !open)}>
             <ShieldCheck size={18} />
@@ -114,7 +114,7 @@ export function GroupManager({ memberships, activeByGroup = {} }: {
           </button>
         </div>
         {message ? (
-          <p className="rounded-lg bg-white px-3 py-2 text-sm font-bold text-[var(--muted)]">{message}</p>
+          <p className="app-notice" role="status">{message}</p>
         ) : null}
       </div>
 

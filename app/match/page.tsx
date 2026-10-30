@@ -34,11 +34,11 @@ export default async function MatchPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="page-wrap">
-      <header className="flex flex-wrap items-end justify-between gap-3 py-3 text-white">
+      <header className="page-intro">
         <div>
           <p className="eyebrow">Matchday</p>
-          <h1 className="text-4xl font-black">My Matches</h1>
-          <p className="text-sm font-medium text-white/62">{(matches ?? []).length} matches</p>
+          <h1>My Matches</h1>
+          <p>{(matches ?? []).length} matches</p>
         </div>
       </header>
 

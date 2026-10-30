@@ -44,10 +44,10 @@ export function Navigation() {
           </span>
           <span>
             <span className="brand-name">Football</span>
-            <span className="brand-subtitle">GROUPS</span>
+            <span className="brand-subtitle">MATCHDAY DESK</span>
           </span>
         </Link>
-        <p className="nav-caption">Workspace</p>
+        <p className="nav-caption">Command centre</p>
         <nav aria-label="Main navigation">
           {items.map(({ href, label, icon: Icon }) => (
             <Link
